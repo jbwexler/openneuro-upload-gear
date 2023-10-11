@@ -1,0 +1,42 @@
+{
+	"name": "openneuro-upload",
+	"label": "Openneuro Uploader",
+	"description": "Uploads BIDS-formatted data to openneuro.org",
+	"version": "0.1.0",
+	"author": "Joe Wexler",
+	"maintainer": "Joe Wexler",
+	"cite": "",
+	"license": "MIT",
+	"url": "",
+	"source": "",
+	"environment": {
+		"FLYWHEEL": "/flywheel/v0"
+	},
+	"custom": {
+		"gear-builder": {
+			"category": "utility",
+			"image": "jbwexler/openneuro-upload:0.1.0"
+		},
+		"flywheel": {
+			"suite": "OpenNeuro"
+		}
+	},
+	"inputs": {
+		"openneuro-credentials": {
+			"description": "A text file containing an OpenNeuro API key.",
+			"base": "file",
+			"type": {
+				"enum": [
+					"text"
+				]
+			}
+		}
+	},
+	"config": {
+		"accession_number": {
+			"description": "Accession number of the OpenNeuro dataset to upload to.",
+			"type": "string"
+		}
+	},
+	"command": "python run.py"
+}
