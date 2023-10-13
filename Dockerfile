@@ -1,18 +1,21 @@
-FROM mambaorg/micromamba:latest
+FROM mambaorg/micromamba:1.5.1
 
 COPY --chown=$MAMBA_USER:$MAMBA_USER env.yaml /tmp/env.yaml
 RUN micromamba create -y -f /tmp/env.yaml && \
 	micromamba clean --all --yes
 
-#ENV PATH="/opt/conda/envs/fmriprep/bin:$PATH"
-#RUN /opt/conda/envs/fmriprep/bin/npm install -g svgo@^2.8 bids-validator@1.11.0 @openneuro/cli && \
-#   rm -r ~/.npm
-#COPY requirements.txt /tmp/requirements.txt
-#RUN /opt/conda/envs/fmriprep/bin/pip install --no-cache-dir -r /tmp/requirements.txt
+ENV PATH="/opt/conda/envs/openneuro-upload/bin:$PATH"
+RUN /opt/conda/envs/openneuro-upload/bin/npm install -g @openneuro/cli && \
+   rm -r ~/.npm
+COPY requirements.txt /tmp/requirements.txt
+RUN /opt/conda/envs/openneuro-upload/bin/pip install --no-cache-dir -r /tmp/requirements.txt
 
-#USER root
-#ENV FLYWHEEL=/flywheel/v0
-#RUN mkdir -p ${FLYWHEEL}
-#COPY run.py ${FLYWHEEL}/run.py
+USER root
+ENV FLYWHEEL=/flywheel/v0
+RUN mkdir -p ${FLYWHEEL}
+COPY run.py ${FLYWHEEL}/run.py
+USER $MAMBA_USER
+WORKDIR ${FLYWHEEL}
 
-#ENTRYPOINT ["python3 run.py"]
+
+ENTRYPOINT ["/usr/local/bin/_entrypoint.sh","python","run.py"]

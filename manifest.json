@@ -15,7 +15,7 @@
 	"custom": {
 		"gear-builder": {
 			"category": "utility",
-			"image": "jbwexler/openneuro-upload:0.1.0"
+			"image": "jbwexler/openneuro-upload-gear:0.1.0"
 		},
 		"flywheel": {
 			"suite": "OpenNeuro"
@@ -33,7 +33,7 @@
 		}
 	},
 	"config": {
-		"accession_number": {
+		"accession-number": {
 			"description": "Accession number of the OpenNeuro dataset to upload to.",
 			"type": "string"
 		}
