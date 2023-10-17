@@ -22,21 +22,42 @@
 		}
 	},
 	"inputs": {
-		"openneuro-credentials": {
-			"description": "A text file containing an OpenNeuro API key.",
+		"openneuro-config": {
+			"description": "A file containing the contents of a .openneuro file.",
 			"base": "file",
 			"type": {
 				"enum": [
 					"text"
 				]
 			}
+		},
+		"git-config": {
+			"description": "A file containing the contents of a .gitconfig file.",
+			"base": "file",
+			"type": {
+				"enum": [
+					"text"
+				]
+			}
+		},
+		"key": {
+			"base": "api-key"
 		}
 	},
 	"config": {
+		"new_dataset": {
+			"description": "Do you intend to create a new dataset on openneuro.org?",
+			"type": "string",
+			"enum": [
+				"yes",
+				"no"
+			]
+		},
 		"accession-number": {
 			"description": "Accession number of the OpenNeuro dataset to upload to.",
-			"type": "string"
+			"type": "string",
+			"optional": true
 		}
 	},
-	"command": "python run.py"
+	"command": "PATH=/opt/conda/envs/openneuro-upload/bin:$PATH; python run.py"
 }

@@ -1,2 +1,4 @@
 flywheel-sdk
+flywheel-bids
+flywheel_gear_toolkit
 datalad
