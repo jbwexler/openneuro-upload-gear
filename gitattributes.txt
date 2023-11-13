@@ -1,8 +1,0 @@
-* annex.largefiles=largerthan=1mb
-*.bval annex.largefiles=nothing
-*.bvec annex.largefiles=nothing
-*.json annex.largefiles=nothing
-*.tsv annex.largefiles=nothing
-.bidsignore annex.largefiles=nothing
-CHANGES annex.largefiles=nothing
-README annex.largefiles=nothing

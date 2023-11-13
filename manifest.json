@@ -2,7 +2,7 @@
 	"name": "openneuro-upload",
 	"label": "Openneuro Uploader",
 	"description": "Uploads BIDS-formatted data to openneuro.org",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"author": "Joe Wexler",
 	"maintainer": "Joe Wexler",
 	"cite": "",
@@ -14,49 +14,38 @@
 	},
 	"custom": {
 		"gear-builder": {
-			"category": "utility",
-			"image": "jbwexler/openneuro-upload:0.1.0"
+			"category": "analysis",
+			"image": "jbwexler/openneuro-upload:0.1.1"
 		},
 		"flywheel": {
 			"suite": "OpenNeuro"
 		}
 	},
 	"inputs": {
-		"openneuro-config": {
-			"description": "A file containing the contents of a .openneuro file.",
-			"base": "file",
-			"type": {
-				"enum": [
-					"text"
-				]
-			}
-		},
-		"git-config": {
-			"description": "A file containing the contents of a .gitconfig file.",
-			"base": "file",
-			"type": {
-				"enum": [
-					"text"
-				]
-			}
-		},
 		"key": {
 			"base": "api-key"
 		}
 	},
 	"config": {
-		"new_dataset": {
-			"description": "Do you intend to create a new dataset on openneuro.org?",
-			"type": "string",
-			"enum": [
-				"yes",
-				"no"
-			]
-		},
 		"accession_number": {
 			"description": "Accession number of the OpenNeuro dataset to upload to.",
 			"type": "string",
 			"optional": true
+		},
+		"git_worker_number": {
+			"description": "git worker number",
+			"type": "integer",
+			"minimum": 1,
+			"maximum": 4
+		},
+		"openneuro_api_key": {
+			"description": "OpenNeuro API key",
+			"type": "string"
+		},
+		"openneuro_url": {
+			"description": "URL of openneuro instance. Default: https://openneuro.org/",
+			"default": "https://openneuro.org/",
+			"type": "string"
 		}
 	},
 	"command": "PATH=/opt/conda/envs/openneuro-upload/bin:$PATH; python run.py"
