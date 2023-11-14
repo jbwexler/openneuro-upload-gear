@@ -8,7 +8,6 @@ from pathlib import Path
 import os.path
 import os
 import pygit2
-import requests
 import json
 import subprocess
 from urllib.parse import urlparse
@@ -19,7 +18,7 @@ def openneuro_callbacks():
     command = './node_modules/.bin/openneuro git-credential fill <<EOF\nprotocol=%s\nhost=%s\npath=%s\nEOF' % (parse.scheme, parse.netloc, parse.path)
     stdout = subprocess.run(command, shell=True, stdout=subprocess.PIPE).stdout
     stdout_str = stdout.decode('ascii')
-    stdout_split = [x.split('=') for x in stdout_str.split('\n')][:-1]
+    stdout_split = [x.split('=') for x in stdout_str.splitlines()]
     credentials_dict = {k:v for [k,v] in stdout_split}
     credentials = pygit2.UserPass(credentials_dict['username'], credentials_dict['password'])
     callbacks = pygit2.RemoteCallbacks(credentials=credentials)
@@ -52,7 +51,7 @@ def bids_validate(path):
 
 # From https://stackoverflow.com/a/42544963
 def find_large_objects():
-    cutoff = 2**20
+    cutoff = 2**20 * 10 # 10mb
     command = '''
     git rev-list --objects --all |
       git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' |
@@ -62,7 +61,6 @@ def find_large_objects():
     stdout = subprocess.run(command, shell=True, stdout=subprocess.PIPE).stdout.decode('ascii')
     files = [x.split() for x in stdout.splitlines()]
     large_files = [[x,int(y),z] for [x,y,z] in files if int(y) > cutoff]
-    import pdb; pdb.set_trace()
     return large_file
     
      
@@ -74,8 +72,14 @@ with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
 command = 'npm update bids-validator'
 #subprocess.run(command, shell=True)
 
-#bids_path = gtk_context.download_session_bids()
-bids_path = '/flywheel/v0/test_bids_ds'
+#import pdb; pdb.set_trace()
+destination_id = gtk_context.config_json['destination']['id']
+job_level = gtk_context.client.get(destination_id)['parent']['type']
+if job_level == 'session':
+    bids_path = gtk_context.download_session_bids()
+else:
+    bids_path = gtk_context.download_project_bids()
+#bids_path = '/flywheel/v0/test_bids_ds'
 bids_validate(bids_path)
 
 config = gtk_context.config
@@ -84,7 +88,6 @@ ds_path = os.path.join(gtk_context.work_dir,config['accession_number'])
 openneuro_config_dict = {"url":config['openneuro_url'], "apikey":config['openneuro_api_key'], "errorReporting":True}
 with open('/root/.openneuro', 'w') as write_file:
     json.dump(openneuro_config_dict, write_file)
-
 
 #import pdb; pdb.set_trace()
 callbacks = openneuro_callbacks()
