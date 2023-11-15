@@ -40,7 +40,7 @@ def git_add_all_commit():
     repo.create_commit(ref, author, committer, message, tree, parents)
     
 def bids_validate(bids_path, ddjson_warn=False):
-    if ddjson_warn == True:
+    if ddjson_warn is True:
         config_path = 'bids-validator-config_ddjson-warn.json'
     else:
         config_path = '../../bids-validator-config_ddjson-err.json'
@@ -52,15 +52,18 @@ def bids_validate(bids_path, ddjson_warn=False):
         print(stdout)
         sys.exit(1)
 
-# From https://stackoverflow.com/a/42544963
+# Checks to make sure large objects (over 10mb) aren't stored in Git.
+# This is both to ensure good git performance and to make sure files
+# accidentally containing private data can later be purged via git-annex.
 def find_large_objects():
     cutoff = 2**20 * 10 # 10mb
+    # From https://stackoverflow.com/a/42544963
     command = '''
-    git rev-list --objects --all |
-      git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' |
+    git -C {ds_path} rev-list --objects --all |
+      git -C {ds_path} cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' |
       sed -n 's/^blob //p' |
       sort --numeric-sort --key=2
-    ''' # Convert to pygit2
+    '''.format(ds_path=ds_path) # Convert to pygit2
     stdout = subprocess.run(command, shell=True, stdout=subprocess.PIPE).stdout.decode('ascii')
     files = [x.split() for x in stdout.splitlines()]
     large_files = [[x,int(y),z] for [x,y,z] in files if int(y) > cutoff]
@@ -76,16 +79,21 @@ def get_bids_data(gtk_context):
     else:
         bids_path = gtk_context.download_project_bids()
     return bids_path
-         
+    
+def cp_bids_data():
+    copytree(bids_path, ds_path, dirs_exist_ok=True, ignore=ignore_patterns('dataset_description.json'))
+    if not os.path.isfile(os.path.join(ds_path,'dataset_description.json')):
+        copyfile(os.path.join(bids_path,'dataset_description.json'), os.path.join(ds_path,'dataset_description.json'))
+    # else: json.dumps to create our own dataset_description.json and copy in
+    
 with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
    gtk_context.init_logging()
    gtk_context.log_config()
-   bids_path = get_bids_data(gtk_context)
+   #bids_path = get_bids_data(gtk_context)
    config = gtk_context.config
    work_dir = gtk_context.work_dir
 
-get_bids_data()
-#bids_path = '/flywheel/v0/test_bids_ds'
+bids_path = '/flywheel/v0/test_bids_ds'
 bids_validate(bids_path, ddjson_warn=True)
 
 ds_url = os.path.join(config['openneuro_url'], 'git', str(config['git_worker_number']), config['accession_number'])
@@ -94,18 +102,16 @@ openneuro_config_dict = {"url":config['openneuro_url'], "apikey":config['openneu
 with open('/root/.openneuro', 'w') as write_file:
     json.dump(openneuro_config_dict, write_file)
 
-#import pdb; pdb.set_trace()
+# Setup openneuro dataset
 callbacks = openneuro_callbacks()
 repo = pygit2.clone_repository(ds_url, ds_path, callbacks=callbacks)
 repo.remotes['origin'].fetch(['git-annex:git-annex'], callbacks=callbacks)
-os.chdir(ds_path)
-command = 'git annex initremote openneuro type=external externaltype=openneuro encryption=none url=%s' % ds_url
+command = 'git -C %s annex initremote openneuro type=external externaltype=openneuro encryption=none url=%s' % (ds_path, ds_url)
 subprocess.run(command, shell=True)
-copytree(bids_path, ds_path, dirs_exist_ok=True, ignore=ignore_patterns('dataset_description.json'))
-if not os.path.isfile(os.path.join(ds_path,'dataset_description.json')):
-    copyfile(os.path.join(bids_path,'dataset_description.json'), os.path.join(ds_path,'dataset_description.json'))
-# else: json.dumps to create our own dataset_description.json and copy in
-command = 'git annex add .'
+
+# Add new data, check for unexpected large objects, then push to openneuro
+cp_bids_data()
+command = 'git -C %s annex add .' % ds_path
 subprocess.run(command, shell=True)
 git_add_all_commit()
 bids_validate(ds_path, False)

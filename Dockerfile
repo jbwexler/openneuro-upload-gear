@@ -19,7 +19,8 @@ RUN mkdir -p ${FLYWHEEL}
 COPY run.py ${FLYWHEEL}/run.py
 COPY test_bids_ds ${FLYWHEEL}/test_bids_ds
 COPY gitconfig.txt /root/.gitconfig
-COPY bids-validator-config.json ${FLYWHEEL}/bids-validator-config.json
+COPY bids-validator-config_ddjson-err.json ${FLYWHEEL}/bids-validator-config_ddjson-err.json
+COPY bids-validator-config_ddjson-warn.json ${FLYWHEEL}/bids-validator-config_ddjson-warn.json
 WORKDIR ${FLYWHEEL}
 
 ENTRYPOINT ["/flywheel/v0/run.py"]
