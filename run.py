@@ -41,10 +41,12 @@ def git_add_all_commit():
     
 def bids_validate(bids_path, ddjson_warn=False):
     if ddjson_warn is True:
-        config_path = 'bids-validator-config_ddjson-warn.json'
+        config_path = os.path.join(fw_path, 'bids-validator-config_ddjson-warn.json')
     else:
-        config_path = '../../bids-validator-config_ddjson-err.json'
-    command = 'bids-validator %s -c %s' % (bids_path, config_path)
+        config_path = os.path.join(fw_path, 'bids-validator-config_ddjson-err.json')
+    config_path_rel = os.path.relpath(config_path, bids_path)
+    
+    command = 'bids-validator %s -c %s' % (bids_path, config_path_rel)
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
     return_code = result.returncode
     stdout = result.stdout.decode('ascii')
@@ -52,10 +54,12 @@ def bids_validate(bids_path, ddjson_warn=False):
         print(stdout)
         sys.exit(1)
 
-# Checks to make sure large objects (over 10mb) aren't stored in Git.
-# This is both to ensure good git performance and to make sure files
-# accidentally containing private data can later be purged via git-annex.
 def find_large_objects():
+    '''
+    Checks to make sure large objects (over 10mb) aren't stored in Git.
+    This is both to ensure good git performance and to make sure files
+    accidentally containing private data can later be purged via git-annex.
+    '''
     cutoff = 2**20 * 10 # 10mb
     # From https://stackoverflow.com/a/42544963
     command = '''
@@ -82,10 +86,16 @@ def get_bids_data(gtk_context):
     
 def cp_bids_data():
     copytree(bids_path, ds_path, dirs_exist_ok=True, ignore=ignore_patterns('dataset_description.json'))
-    if not os.path.isfile(os.path.join(ds_path,'dataset_description.json')):
-        copyfile(os.path.join(bids_path,'dataset_description.json'), os.path.join(ds_path,'dataset_description.json'))
-    # else: json.dumps to create our own dataset_description.json and copy in
-    
+    ddjson_path_on = os.path.join(ds_path,'dataset_description.json')
+    ddjson_path_fw = os.path.join(bids_path,'dataset_description.json')
+    if not os.path.isfile(ddjson_path_on):
+        if os.path.isfile(ddjson_path_fw):
+            copyfile(ddjson_path_fw, ddjson_path_on)
+        else:
+            ddjson_dict = {"Name": "WBHI", "BIDSVersion": bids_version, "Authors": ["Emily Jacobs"]}
+            with open(ddjson_path_on, 'w') as write_file:
+                json.dump(ddjson_dict, write_file)
+                
 with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
    gtk_context.init_logging()
    gtk_context.log_config()
@@ -93,6 +103,8 @@ with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
    config = gtk_context.config
    work_dir = gtk_context.work_dir
 
+bids_version = "1.8.0"
+fw_path = '/flywheel/v0/'
 bids_path = '/flywheel/v0/test_bids_ds'
 bids_validate(bids_path, ddjson_warn=True)
 
@@ -114,7 +126,7 @@ cp_bids_data()
 command = 'git -C %s annex add .' % ds_path
 subprocess.run(command, shell=True)
 git_add_all_commit()
-bids_validate(ds_path, False)
+bids_validate(ds_path)
 find_large_objects()
 # git push main and git-annex
 import pdb; pdb.set_trace()

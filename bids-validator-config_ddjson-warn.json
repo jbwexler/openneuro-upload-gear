@@ -1,5 +1,5 @@
 {
-	"warn": ["DATASET_DESCRIPTION_JSON_MISSING"],
+    "warn": ["DATASET_DESCRIPTION_JSON_MISSING"],
     "error": ["NO_AUTHORS", "EMPTY_DATASET_NAME"],
     "ignoreSubjectConsistency": true,
     "blacklistModalities": ["Microscopy"]
