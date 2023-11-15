@@ -1,5 +1,5 @@
 {
-    error: ["NO_AUTHORS", "EMPTY_DATASET_NAME"],
-    ignoreSubjectConsistency: true,
-    blacklistModalities: ["Microscopy"]
+    "error": ["NO_AUTHORS", "EMPTY_DATASET_NAME"],
+    "ignoreSubjectConsistency": true,
+    "blacklistModalities": ["Microscopy"]
 }
