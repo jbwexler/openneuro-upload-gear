@@ -1,7 +1,7 @@
 FROM mambaorg/micromamba:1.5.1
 USER root
 
-COPY --chown=$MAMBA_USER:$MAMBA_USER env.yaml /tmp/env.yaml
+COPY env.yaml /tmp/env.yaml
 RUN micromamba create -y -f /tmp/env.yaml && \
 	micromamba clean --all --yes
 
@@ -19,6 +19,7 @@ RUN mkdir -p ${FLYWHEEL}
 COPY run.py ${FLYWHEEL}/run.py
 COPY test_bids_ds ${FLYWHEEL}/test_bids_ds
 COPY gitconfig.txt /root/.gitconfig
+COPY bids-validator-config.json ${FLYWHEEL}/bids-validator-config.json
 WORKDIR ${FLYWHEEL}
 
 ENTRYPOINT ["/flywheel/v0/run.py"]

@@ -8,8 +8,6 @@ attrs==23.1.0
     # via
     #   jsonschema
     #   referencing
-bids-validator==1.13.1
-    # via -r requirements.in
 certifi==2023.7.22
     # via
     #   flywheel-sdk
@@ -43,7 +41,7 @@ jsonschema==4.19.2
     #   flywheel-bids
     #   flywheel-gear-toolkit
     #   flywheel-gears
-jsonschema-specifications==2023.7.1
+jsonschema-specifications==2023.11.1
     # via jsonschema
 packaging==23.2
     # via flywheel-sdk
@@ -53,7 +51,7 @@ pygit2==1.13.2
     # via -r requirements.in
 python-dateutil==2.8.2
     # via flywheel-sdk
-referencing==0.30.2
+referencing==0.31.0
     # via
     #   jsonschema
     #   jsonschema-specifications
@@ -75,7 +73,7 @@ six==1.16.0
     # via
     #   flywheel-sdk
     #   python-dateutil
-urllib3==2.0.7
+urllib3==2.1.0
     # via
     #   flywheel-bids
     #   flywheel-sdk
