@@ -12,6 +12,11 @@ import subprocess
 from urllib.parse import urlparse
 import sys
 
+log = logging.getLogger(__name__)
+
+FW_PATH = '/flywheel/v0/'
+BIDS_VERSION = "1.8.0"
+
 def copy_tree(src, dst, ignore=[]):
     if not os.path.exists(dst):
         os.makedirs(dst)
@@ -26,7 +31,7 @@ def copy_tree(src, dst, ignore=[]):
             os.remove(d)
             shutil.copyfile(s, d)
 
-def openneuro_callbacks():
+def openneuro_callbacks(ds_url):
     parse = urlparse(ds_url)
     command = (
         "./node_modules/.bin/openneuro git-credential fill <<EOF\nprotocol=%s\nhost=%s\npath=%s\nEOF"
@@ -41,7 +46,7 @@ def openneuro_callbacks():
     return credentials, callbacks
 
 
-def git_add_all_commit():
+def git_add_all_commit(repo):
     git_config = pygit2.Config.get_global_config()
     name = git_config["user.name"]
     email = git_config["user.email"]
@@ -58,11 +63,11 @@ def git_add_all_commit():
     repo.create_commit(ref, author, committer, message, tree, parents)
 
 
-def bids_validate(bids_path, ddjson_warn=False):
+def bids_validate(bids_path, ds_path, ddjson_warn=False):
     if ddjson_warn is True:
-        config_path = os.path.join(fw_path, "bids-validator-config_ddjson-warn.json")
+        config_path = os.path.join(FW_PATH, "bids-validator-config_ddjson-warn.json")
     else:
-        config_path = os.path.join(fw_path, "bids-validator-config_ddjson-err.json")
+        config_path = os.path.join(FW_PATH, "bids-validator-config_ddjson-err.json")
     config_path_rel = os.path.relpath(config_path, bids_path)
 
     command = "bids-validator %s -c %s" % (bids_path, config_path_rel)
@@ -74,7 +79,7 @@ def bids_validate(bids_path, ddjson_warn=False):
         sys.exit(1)
 
 
-def find_large_objects():
+def find_large_objects(ds_path):
     """
     Checks to make sure large objects (over 10mb) aren't stored in Git.
     This is both to ensure good git performance and to make sure files
@@ -104,7 +109,7 @@ def get_bids_data(gtk_context):
     return bids_path
 
 
-def cp_bids_data():
+def cp_bids_data(bids_path, ds_path):
     copy_tree(bids_path, ds_path, ignore=['dataset_description.json'])
     ddjson_path_on = os.path.join(ds_path, "dataset_description.json")
     ddjson_path_fw = os.path.join(bids_path, "dataset_description.json")
@@ -114,66 +119,68 @@ def cp_bids_data():
         else:
             ddjson_dict = {
                 "Name": "WBHI",
-                "BIDSVersion": bids_version,
+                "BIDSVersion": BIDS_VERSION,
                 "Authors": ["Emily Jacobs"],
             }
             with open(ddjson_path_on, "w") as write_file:
                 json.dump(ddjson_dict, write_file)
 
-
-with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
+def main(gear_context):
     gtk_context.init_logging()
     gtk_context.log_config()
-    # bids_path = get_bids_data(gtk_context)
     config = gtk_context.config
     work_dir = gtk_context.work_dir
 
-bids_version = "1.8.0"
-fw_path = "/flywheel/v0/"
-ds_url = os.path.join(
-    config["openneuro_url"],
-    "git",
-    str(config["git_worker_number"]),
-    config["accession_number"],
-)
-ds_path = os.path.join(work_dir, config["accession_number"])
-openneuro_config_dict = {
-    "url": config["openneuro_url"],
-    "apikey": config["openneuro_api_key"],
-    "errorReporting": True,
-}
-with open("/root/.openneuro", "w") as write_file:
-    json.dump(openneuro_config_dict, write_file)
+    ds_url = os.path.join(
+        config["openneuro_url"],
+        "git",
+        str(config["git_worker_number"]),
+        config["accession_number"],
+    )
+    ds_path = os.path.join(work_dir, config["accession_number"])
+    openneuro_config_dict = {
+        "url": config["openneuro_url"],
+        "apikey": config["openneuro_api_key"],
+        "errorReporting": True,
+    }
+    with open("/root/.openneuro", "w") as write_file:
+        json.dump(openneuro_config_dict, write_file)
 
-# Validate flywheel data
-bids_path = "/flywheel/v0/test_bids_ds"
-bids_validate(bids_path, ddjson_warn=True)
+    # Validate flywheel data
+    #bids_path = get_bids_data(gtk_context)
+    bids_path = "/flywheel/v0/test_bids_ds"
+    bids_validate(bids_path, ds_path, ddjson_warn=True)
 
-# Setup openneuro dataset
-credentials, callbacks = openneuro_callbacks()
-repo = pygit2.clone_repository(ds_url, ds_path, callbacks=callbacks)
-repo.remotes["origin"].fetch(["git-annex:git-annex"], callbacks=callbacks)
-command = (
-    "git -C %s annex initremote openneuro type=external externaltype=openneuro encryption=none url=%s"
-    % (ds_path, ds_url)
-)
-subprocess.run(command, shell=True)
+    # Setup openneuro dataset
+    credentials, callbacks = openneuro_callbacks(ds_url)
+    repo = pygit2.clone_repository(ds_url, ds_path, callbacks=callbacks)
+    repo.remotes["origin"].fetch(["git-annex:git-annex"], callbacks=callbacks)
+    command = (
+        "git -C %s annex initremote openneuro type=external externaltype=openneuro encryption=none url=%s"
+        % (ds_path, ds_url)
+    )
+    subprocess.run(command, shell=True)
 
-# Add new data
-cp_bids_data()
-command = "git -C %s annex add ." % ds_path
-subprocess.run(command, shell=True)
-git_add_all_commit()
+    # Add new data
+    cp_bids_data(bids_path, ds_path)
+    command = "git -C %s annex add ." % ds_path
+    subprocess.run(command, shell=True)
+    git_add_all_commit(repo)
 
-# Perform checks
-bids_validate(ds_path)
-find_large_objects()
+    # Perform checks
+    bids_validate(ds_path)
+    find_large_objects(ds_path)
 
-# Push to openneuro
-# remote = repo.remotes['origin']
-# remote.credentials = credentials
-# remote.push(['refs/heads/main'],callbacks=callbacks)
-command = "git -C %s push origin main" % ds_path
-subprocess.run(command, shell=True)
-command = "git -C %s annex copy --to openneuro" % ds_path
-subprocess.run(command, shell=True)
+    # Push to openneuro
+    # remote = repo.remotes['origin']
+    # remote.credentials = credentials
+    # remote.push(['refs/heads/main'],callbacks=callbacks)
+    command = "git -C %s push origin main" % ds_path
+    subprocess.run(command, shell=True)
+    command = "git -C %s annex copy --to openneuro" % ds_path
+    subprocess.run(command, shell=True)
+
+
+if __name__ == "__main__":
+    with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
+        main(gtk_context)
