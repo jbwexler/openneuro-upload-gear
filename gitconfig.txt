@@ -1,3 +1,9 @@
 [user]
 	name = WBHI Bot
 	email = wbhi.bot@gmail.com
+[credential "https://openneuro.org"]
+	 useHttpPath = true
+	 helper = "/flywheel/v0/node_modules/.bin/openneuro git-credential"
+[credential "https://staging.openneuro.org"]
+ 	useHttpPath = true
+ 	helper = "/flywheel/v0/node_modules/.bin/openneuro git-credential"
