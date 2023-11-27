@@ -11,6 +11,7 @@ import json
 import subprocess
 from urllib.parse import urlparse
 import sys
+import contextlib
 
 log = logging.getLogger(__name__)
 
@@ -26,9 +27,10 @@ def copy_tree(src, dst, ignore=[]):
         if os.path.isdir(s):
             copy_tree(s, d)
         elif os.path.isfile(s):
-            if s in ignore:
+            if item in ignore:
                 continue
-            os.remove(d)
+            with contextlib.suppress(FileNotFoundError):
+                os.remove(d)
             shutil.copyfile(s, d)
 
 def openneuro_callbacks(ds_url):
@@ -147,8 +149,8 @@ def main(gear_context):
         json.dump(openneuro_config_dict, write_file)
 
     # Validate flywheel data
-    #bids_path = get_bids_data(gtk_context)
-    bids_path = "/flywheel/v0/test_bids_ds"
+    bids_path = get_bids_data(gtk_context)
+    #bids_path = "/flywheel/v0/test_bids_ds"
     bids_validate(bids_path, ds_path, ddjson_warn=True)
 
     # Setup openneuro dataset
