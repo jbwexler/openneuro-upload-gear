@@ -72,7 +72,7 @@ def bids_validate(bids_path, ddjson_warn=False):
     config_path_rel = os.path.relpath(config_path, bids_path)
 
     command = "bids-validator %s -c %s" % (bids_path, config_path_rel)
-    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, check=True)
+    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
     return_code = result.returncode
     stdout = result.stdout.decode("ascii")
     if return_code == 1:
@@ -159,7 +159,6 @@ def main(gear_context):
 
     # Validate flywheel data
     bids_path, sessions = get_bids_data(gtk_context)
-    #bids_path = "/flywheel/v0/test_bids_ds"
     bids_validate(bids_path, ddjson_warn=True)
 
     # Setup openneuro dataset
@@ -190,7 +189,8 @@ def main(gear_context):
     
     # Tag sessions after upload
     for s in sessions:
-        s.add_tag('openneuro')
+        if "openneuro" not in s.tags: # maybe should use accession number rather than 'openneuro'?
+            s.add_tag("openneuro")
         
 
 if __name__ == "__main__":

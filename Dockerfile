@@ -24,13 +24,12 @@ WORKDIR ${FLYWHEEL}
 ENV PATH="/opt/conda/envs/openneuro-upload/bin:$PATH"
 RUN /opt/conda/envs/openneuro-upload/bin/npm install && \
 	rm -r ~/.npm
-ENV	PATH="${FLYWHEEL}/node_modules/.bin:$PATH"
+ENV PATH="${FLYWHEEL}/node_modules/.bin:$PATH"
 COPY requirements.txt /tmp/requirements.txt
 RUN /opt/conda/envs/openneuro-upload/bin/pip install --no-cache-dir -r /tmp/requirements.txt
 
 RUN mkdir -p ${FLYWHEEL}
 COPY run.py ${FLYWHEEL}/run.py
-COPY test_bids_ds ${FLYWHEEL}/test_bids_ds
 COPY gitconfig.txt /root/.gitconfig
 COPY bids-validator-config_ddjson-err.json ${FLYWHEEL}/bids-validator-config_ddjson-err.json
 COPY bids-validator-config_ddjson-warn.json ${FLYWHEEL}/bids-validator-config_ddjson-warn.json

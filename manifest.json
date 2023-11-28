@@ -2,7 +2,7 @@
 	"name": "openneuro-upload",
 	"label": "Openneuro Uploader",
 	"description": "Uploads BIDS-formatted data to openneuro.org",
-	"version": "0.1.2",
+	"version": "0.1.8",
 	"author": "Joe Wexler",
 	"maintainer": "Joe Wexler",
 	"cite": "",
@@ -15,7 +15,7 @@
 	"custom": {
 		"gear-builder": {
 			"category": "analysis",
-			"image": "jbwexler/openneuro-upload:0.1.2"
+			"image": "jbwexler/openneuro-upload:0.1.8"
 		},
 		"flywheel": {
 			"suite": "OpenNeuro"
@@ -48,5 +48,5 @@
 			"type": "string"
 		}
 	},
-	"command": "PATH=/opt/conda/envs/openneuro-upload/bin:$PATH; python run.py"
+	"command": "PATH=/opt/conda/envs/openneuro-upload/bin:${FLYWHEEL}/node_modules/.bin:$PATH; python run.py"
 }
