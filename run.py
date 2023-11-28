@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import flywheel
 import flywheel_gear_toolkit
 import logging
 import shutil
@@ -39,7 +38,7 @@ def openneuro_callbacks(ds_url):
         "./node_modules/.bin/openneuro git-credential fill <<EOF\nprotocol=%s\nhost=%s\npath=%s\nEOF"
         % (parse.scheme, parse.netloc, parse.path)
     )
-    stdout = subprocess.run(command, shell=True, stdout=subprocess.PIPE).stdout
+    stdout = subprocess.run(command, shell=True, stdout=subprocess.PIPE, check=True).stdout
     stdout_str = stdout.decode("ascii")
     stdout_split = [x.split("=") for x in stdout_str.splitlines()]
     credentials_dict = {k: v for [k, v] in stdout_split}
@@ -65,7 +64,7 @@ def git_add_all_commit(repo):
     repo.create_commit(ref, author, committer, message, tree, parents)
 
 
-def bids_validate(bids_path, ds_path, ddjson_warn=False):
+def bids_validate(bids_path, ddjson_warn=False):
     if ddjson_warn is True:
         config_path = os.path.join(FW_PATH, "bids-validator-config_ddjson-warn.json")
     else:
@@ -73,7 +72,7 @@ def bids_validate(bids_path, ds_path, ddjson_warn=False):
     config_path_rel = os.path.relpath(config_path, bids_path)
 
     command = "bids-validator %s -c %s" % (bids_path, config_path_rel)
-    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
+    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, check=True)
     return_code = result.returncode
     stdout = result.stdout.decode("ascii")
     if return_code == 1:
@@ -104,11 +103,21 @@ def find_large_objects(ds_path):
 
 
 def get_bids_data(gtk_context):
+    cl = gtk_context.client
     destination_id = gtk_context.config_json["destination"]["id"]
-    job_level = gtk_context.client.get(destination_id)["parent"]["type"]
-    data_id = gtk_context.client.get(destination_id)["parents"][job_level]
-    bids_path = gtk_context.download_project_bids(data_id)
-    return bids_path
+    job_level = cl.get(destination_id)["parent"]["type"]
+    data_id = cl.get(destination_id)["parents"][job_level]
+    if job_level == "session":
+        sessions = [cl.get_session(data_id)]
+    elif job_level == "subject":
+        subject = cl.get_subject(data_id)
+        sessions = subject.sessions()
+    elif job_level == "project":
+        project = cl.get_project(data_id)
+        sessions = [s for s in project.sessions() if "openneuro" not in s.tags]
+    session_labels = [s.label for s in sessions]
+    bids_path = gtk_context.download_project_bids(sessions=session_labels)
+    return bids_path, sessions
 
 
 def cp_bids_data(bids_path, ds_path):
@@ -149,9 +158,9 @@ def main(gear_context):
         json.dump(openneuro_config_dict, write_file)
 
     # Validate flywheel data
-    bids_path = get_bids_data(gtk_context)
+    bids_path, sessions = get_bids_data(gtk_context)
     #bids_path = "/flywheel/v0/test_bids_ds"
-    bids_validate(bids_path, ds_path, ddjson_warn=True)
+    bids_validate(bids_path, ddjson_warn=True)
 
     # Setup openneuro dataset
     credentials, callbacks = openneuro_callbacks(ds_url)
@@ -161,12 +170,12 @@ def main(gear_context):
         "git -C %s annex initremote openneuro type=external externaltype=openneuro encryption=none url=%s"
         % (ds_path, ds_url)
     )
-    subprocess.run(command, shell=True)
+    subprocess.run(command, shell=True, check=True)
 
     # Add new data
     cp_bids_data(bids_path, ds_path)
     command = "git -C %s annex add ." % ds_path
-    subprocess.run(command, shell=True)
+    subprocess.run(command, shell=True, check=True)
     git_add_all_commit(repo)
 
     # Perform checks
@@ -174,14 +183,15 @@ def main(gear_context):
     find_large_objects(ds_path)
 
     # Push to openneuro
-    # remote = repo.remotes['origin']
-    # remote.credentials = credentials
-    # remote.push(['refs/heads/main'],callbacks=callbacks)
     command = "git -C %s push origin main" % ds_path
-    subprocess.run(command, shell=True)
+    subprocess.run(command, shell=True, check=True)
     command = "git -C %s annex copy --to openneuro" % ds_path
-    subprocess.run(command, shell=True)
-
+    subprocess.run(command, shell=True, check=True)
+    
+    # Tag sessions after upload
+    for s in sessions:
+        s.add_tag('openneuro')
+        
 
 if __name__ == "__main__":
     with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
