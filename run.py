@@ -15,7 +15,8 @@ import contextlib
 log = logging.getLogger(__name__)
 
 FW_PATH = '/flywheel/v0/'
-BIDS_VERSION = "1.8.0"
+BIDS_VERSION = "1.9.0"
+
 
 def copy_tree(src, dst, ignore=[]):
     if not os.path.exists(dst):
@@ -74,7 +75,7 @@ def bids_validate(bids_path, ddjson_warn=False):
     command = "bids-validator %s -c %s" % (bids_path, config_path_rel)
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
     return_code = result.returncode
-    stdout = result.stdout.decode("ascii")
+    stdout = result.stdout.decode()
     if return_code == 1:
         print(stdout)
         sys.exit(1)
@@ -94,7 +95,7 @@ def find_large_objects(ds_path):
       sed -n 's/^blob //p' |
       sort --numeric-sort --key=2
     """.format(ds_path=ds_path)  # Convert to pygit2
-    stdout = subprocess.run(command, shell=True, stdout=subprocess.PIPE).stdout.decode("ascii")
+    stdout = subprocess.run(command, shell=True, stdout=subprocess.PIPE).stdout.decode()
     files = [x.split() for x in stdout.splitlines()]
     large_files = [[x, int(y), z] for [x, y, z] in files if int(y) > cutoff]
     if len(large_files) > 0:
@@ -102,7 +103,7 @@ def find_large_objects(ds_path):
         sys.exit(1)
 
 
-def get_bids_data(gtk_context):
+def get_bids_data(gtk_context, accession_number):
     cl = gtk_context.client
     destination_id = gtk_context.config_json["destination"]["id"]
     job_level = cl.get(destination_id)["parent"]["type"]
@@ -120,35 +121,32 @@ def get_bids_data(gtk_context):
     return bids_path, sessions
 
 
-def cp_bids_data(bids_path, ds_path):
+def cp_bids_data(gtk_context, bids_path, ds_path):
+    cl = gtk_context.client
     copy_tree(bids_path, ds_path, ignore=['dataset_description.json'])
     ddjson_path_on = os.path.join(ds_path, "dataset_description.json")
-    ddjson_path_fw = os.path.join(bids_path, "dataset_description.json")
     if not os.path.isfile(ddjson_path_on):
-        if os.path.isfile(ddjson_path_fw):
-            shutil.copyfile(ddjson_path_fw, ddjson_path_on)
-        else:
-            ddjson_dict = {
-                "Name": "WBHI",
-                "BIDSVersion": BIDS_VERSION,
-                "Authors": ["Emily Jacobs"],
-            }
-            with open(ddjson_path_on, "w") as write_file:
-                json.dump(ddjson_dict, write_file)
+        destination_id = gtk_context.config_json["destination"]["id"]
+        project_id = cl.get(destination_id)["parents"]["project"]
+        project = cl.get_project(project_id)
+        ddjson_dict = project["info"]["BIDS"]
+        with open(ddjson_path_on, "w") as write_file:
+            json.dump(ddjson_dict, write_file)
 
 def main(gear_context):
     gtk_context.init_logging()
     gtk_context.log_config()
     config = gtk_context.config
     work_dir = gtk_context.work_dir
-
+    accession_number = config["accession_number"]
+    
     ds_url = os.path.join(
         config["openneuro_url"],
         "git",
         str(config["git_worker_number"]),
-        config["accession_number"],
+        accession_number,
     )
-    ds_path = os.path.join(work_dir, config["accession_number"])
+    ds_path = os.path.join(work_dir, accession_number)
     openneuro_config_dict = {
         "url": config["openneuro_url"],
         "apikey": config["openneuro_api_key"],
@@ -158,7 +156,7 @@ def main(gear_context):
         json.dump(openneuro_config_dict, write_file)
 
     # Validate flywheel data
-    bids_path, sessions = get_bids_data(gtk_context)
+    bids_path, sessions = get_bids_data(gtk_context, accession_number)
     bids_validate(bids_path, ddjson_warn=True)
 
     # Setup openneuro dataset
@@ -172,7 +170,7 @@ def main(gear_context):
     subprocess.run(command, shell=True, check=True)
 
     # Add new data
-    cp_bids_data(bids_path, ds_path)
+    cp_bids_data(gtk_context, bids_path, ds_path)
     command = "git -C %s annex add ." % ds_path
     subprocess.run(command, shell=True, check=True)
     git_add_all_commit(repo)
@@ -189,8 +187,8 @@ def main(gear_context):
     
     # Tag sessions after upload
     for s in sessions:
-        if "openneuro" not in s.tags: # maybe should use accession number rather than 'openneuro'?
-            s.add_tag("openneuro")
+        if accession_number not in s.tags:
+            s.add_tag(accession_number)
         
 
 if __name__ == "__main__":
