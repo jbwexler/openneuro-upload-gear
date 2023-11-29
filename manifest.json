@@ -35,12 +35,14 @@
 		"git_worker_number": {
 			"description": "git worker number",
 			"type": "integer",
-			"minimum": 1,
-			"maximum": 4
+			"minimum": 0,
+			"maximum": 3,
+			"optional": true
 		},
 		"openneuro_api_key": {
 			"description": "OpenNeuro API key",
-			"type": "string"
+			"type": "string",
+			"optional": true
 		},
 		"openneuro_url": {
 			"description": "URL of openneuro instance. Default: https://openneuro.org/",

@@ -103,33 +103,27 @@ def find_large_objects(ds_path):
         sys.exit(1)
 
 
-def get_bids_data(gtk_context, accession_number):
-    cl = gtk_context.client
-    destination_id = gtk_context.config_json["destination"]["id"]
-    job_level = cl.get(destination_id)["parent"]["type"]
-    data_id = cl.get(destination_id)["parents"][job_level]
+def get_bids_data(client, destination_id, accession_number):
+    job_level = client.get(destination_id)["parent"]["type"]
+    data_id = client.get(destination_id)["parents"][job_level]
     if job_level == "session":
-        sessions = [cl.get_session(data_id)]
+        sessions = [client.get_session(data_id)]
     elif job_level == "subject":
-        subject = cl.get_subject(data_id)
+        subject = client.get_subject(data_id)
         sessions = subject.sessions()
     elif job_level == "project":
-        project = cl.get_project(data_id)
+        project = client.get_project(data_id)
         sessions = [s for s in project.sessions() if "openneuro" not in s.tags]
     session_labels = [s.label for s in sessions]
     bids_path = gtk_context.download_project_bids(sessions=session_labels)
     return bids_path, sessions
 
 
-def cp_bids_data(gtk_context, bids_path, ds_path):
-    cl = gtk_context.client
+def cp_bids_data(project_info, bids_path, ds_path):
     copy_tree(bids_path, ds_path, ignore=['dataset_description.json'])
     ddjson_path_on = os.path.join(ds_path, "dataset_description.json")
     if not os.path.isfile(ddjson_path_on):
-        destination_id = gtk_context.config_json["destination"]["id"]
-        project_id = cl.get(destination_id)["parents"]["project"]
-        project = cl.get_project(project_id)
-        ddjson_dict = project["info"]["BIDS"]
+        ddjson_dict = project_info["BIDS"]
         with open(ddjson_path_on, "w") as write_file:
             json.dump(ddjson_dict, write_file)
 
@@ -138,25 +132,41 @@ def main(gear_context):
     gtk_context.log_config()
     config = gtk_context.config
     work_dir = gtk_context.work_dir
-    accession_number = config["accession_number"]
+    client = gtk_context.client
     
+    destination_id = gtk_context.config_json["destination"]["id"]
+    project_id = client.get(destination_id)["parents"]["project"]
+    project_info = client.get_project(project_id)["info"]
+    
+    accession_number = config["accession_number"]
+    openneuro_api_key = config["openneuro_api_key"]
+    openneuro_url = config["openneuro_url"]
+    
+    if "openneuro-upload" in project_info:
+        if "accession_number" in project_info["openneuro-upload"]:
+            accession_number = project_info["openneuro-upload"]["accession_number"]
+        if "openneuro_api_key" in project_info["openneuro-upload"]:
+            openneuro_api_key = project_info["openneuro-upload"]["openneuro_api_key"]
+        if "openneuro_url" in project_info["openneuro-upload"]:
+            openneuro_url = project_info["openneuro-upload"]["openneuro_url"]
+
     ds_url = os.path.join(
-        config["openneuro_url"],
+        openneuro_url,
         "git",
         str(config["git_worker_number"]),
         accession_number,
     )
     ds_path = os.path.join(work_dir, accession_number)
     openneuro_config_dict = {
-        "url": config["openneuro_url"],
-        "apikey": config["openneuro_api_key"],
+        "url": openneuro_url,
+        "apikey": openneuro_api_key,
         "errorReporting": True,
     }
     with open("/root/.openneuro", "w") as write_file:
         json.dump(openneuro_config_dict, write_file)
 
     # Validate flywheel data
-    bids_path, sessions = get_bids_data(gtk_context, accession_number)
+    bids_path, sessions = get_bids_data(client, destination_id, accession_number)
     bids_validate(bids_path, ddjson_warn=True)
 
     # Setup openneuro dataset
@@ -170,7 +180,7 @@ def main(gear_context):
     subprocess.run(command, shell=True, check=True)
 
     # Add new data
-    cp_bids_data(gtk_context, bids_path, ds_path)
+    cp_bids_data(project_info, bids_path, ds_path)
     command = "git -C %s annex add ." % ds_path
     subprocess.run(command, shell=True, check=True)
     git_add_all_commit(repo)
