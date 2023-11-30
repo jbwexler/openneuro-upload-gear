@@ -8,15 +8,37 @@ import os
 import pygit2
 import json
 import subprocess
-from urllib.parse import urlparse
 import sys
 import contextlib
+import requests
+from urllib.parse import urlparse
+
 
 log = logging.getLogger(__name__)
 
 FW_PATH = '/flywheel/v0/'
 BIDS_VERSION = "1.9.0"
 
+def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
+    data = """
+    {
+        "query":
+            "query {
+                dataset(id: \\"accession_number\\") {
+                    worker
+                }
+            }",
+        "variables": {}
+    }
+    """.replace("\n", "").replace("accession_number", accession_number)
+    
+    headers = {"Content-Type": "application/json"}
+    cookies = {"accessToken": openneuro_api_key}
+    url = os.path.join(openneuro_url, 'crn/graphql')
+    
+    response = requests.post(url, headers=headers, data=data, cookies=cookies)
+    git_worker_number = str(response.json()['data']['dataset']['worker'][-1])
+    return git_worker_number
 
 def copy_tree(src, dst, ignore=[]):
     if not os.path.exists(dst):
@@ -149,11 +171,12 @@ def main(gear_context):
             openneuro_api_key = project_info["openneuro-upload"]["openneuro_api_key"]
         if "openneuro_url" in project_info["openneuro-upload"]:
             openneuro_url = project_info["openneuro-upload"]["openneuro_url"]
-
+    
+    git_worker_number = get_git_worker_number(accession_number, openneuro_url, openneuro_api_key)
     ds_url = os.path.join(
         openneuro_url,
         "git",
-        str(config["git_worker_number"]),
+        git_worker_number,
         accession_number,
     )
     ds_path = os.path.join(work_dir, accession_number)

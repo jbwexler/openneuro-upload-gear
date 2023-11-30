@@ -32,13 +32,6 @@
 			"type": "string",
 			"optional": true
 		},
-		"git_worker_number": {
-			"description": "git worker number",
-			"type": "integer",
-			"minimum": 0,
-			"maximum": 3,
-			"optional": true
-		},
 		"openneuro_api_key": {
 			"description": "OpenNeuro API key",
 			"type": "string",
