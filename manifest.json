@@ -1,8 +1,8 @@
 {
 	"name": "openneuro-upload",
 	"label": "Openneuro Uploader",
-	"description": "Uploads BIDS-formatted data to openneuro.org",
-	"version": "0.1.10",
+	"description": "Uploads BIDS data to openneuro.org",
+	"version": "0.1.13",
 	"author": "Joe Wexler",
 	"maintainer": "Joe Wexler",
 	"cite": "",
@@ -10,12 +10,30 @@
 	"url": "",
 	"source": "",
 	"environment": {
-		"FLYWHEEL": "/flywheel/v0"
+		"FLYWHEEL": "/flywheel/v0",
+		"MAMBA_USER_ID": "57439",
+		"ENV_NAME": "base",
+		"MAMBA_USER": "mambauser",
+		"HOSTNAME": "677a334a253c",
+		"PWD": "/flywheel/v0",
+		"CONDA_PREFIX": "/opt/conda",
+		"MAMBA_ROOT_PREFIX": "/opt/conda",
+		"HOME": "/root",
+		"LANG": "C.UTF-8",
+		"CONDA_PROMPT_MODIFIER": "(base) ",
+		"MAMBA_EXE": "/bin/micromamba",
+		"MAMBA_USER_GID": "57439",
+		"TERM": "xterm",
+		"CONDA_SHLVL": "1",
+		"SHLVL": "1",
+		"CONDA_DEFAULT_ENV": "base",
+		"LC_ALL": "C.UTF-8",
+		"PATH": "/opt/conda/bin:/opt/conda/condabin:/flywheel/v0/node_modules/.bin:/opt/conda/envs/openneuro-upload/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 	},
 	"custom": {
 		"gear-builder": {
 			"category": "analysis",
-			"image": "jbwexler/openneuro-upload:0.1.10"
+			"image": "jbwexler/openneuro-upload:0.1.13"
 		},
 		"flywheel": {
 			"suite": "OpenNeuro"
@@ -39,9 +57,9 @@
 		},
 		"openneuro_url": {
 			"description": "URL of openneuro instance. Default: https://openneuro.org/",
-			"default": "https://openneuro.org/",
-			"type": "string"
+			"type": "string",
+			"optional": true
 		}
 	},
-	"command": "PATH=/opt/conda/envs/openneuro-upload/bin:${FLYWHEEL}/node_modules/.bin:$PATH; python run.py"
+	"command": "python run.py"
 }

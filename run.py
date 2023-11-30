@@ -160,9 +160,14 @@ def main(gear_context):
     project_id = client.get(destination_id)["parents"]["project"]
     project_info = client.get_project(project_id)["info"]
     
-    accession_number = config["accession_number"]
-    openneuro_api_key = config["openneuro_api_key"]
-    openneuro_url = config["openneuro_url"]
+    openneuro_url = "https://openneuro.org" # Default value
+    if config:
+        if "accession_number" in config:
+            accession_number = config["accession_number"]
+        if "openneuro_api_key" in config:
+            openneuro_api_key = config["openneuro_api_key"]
+        if "openneuro_url" in config:
+            openneuro_url = config["openneuro_url"]
     
     if "openneuro-upload" in project_info:
         if "accession_number" in project_info["openneuro-upload"]:
