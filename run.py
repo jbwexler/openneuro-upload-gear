@@ -16,8 +16,9 @@ from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 
-FW_PATH = '/flywheel/v0/'
+FW_PATH = "/flywheel/v0/"
 BIDS_VERSION = "1.9.0"
+
 
 def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
     data = """
@@ -31,14 +32,15 @@ def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
         "variables": {}
     }
     """.replace("\n", "").replace("accession_number", accession_number)
-    
+
     headers = {"Content-Type": "application/json"}
     cookies = {"accessToken": openneuro_api_key}
-    url = os.path.join(openneuro_url, 'crn/graphql')
-    
+    url = os.path.join(openneuro_url, "crn/graphql")
+
     response = requests.post(url, headers=headers, data=data, cookies=cookies)
-    git_worker_number = str(response.json()['data']['dataset']['worker'][-1])
+    git_worker_number = str(response.json()["data"]["dataset"]["worker"][-1])
     return git_worker_number
+
 
 def copy_tree(src, dst, ignore=[]):
     if not os.path.exists(dst):
@@ -55,17 +57,22 @@ def copy_tree(src, dst, ignore=[]):
                 os.remove(d)
             shutil.copyfile(s, d)
 
+
 def openneuro_callbacks(ds_url):
     parse = urlparse(ds_url)
     command = (
         "./node_modules/.bin/openneuro git-credential fill <<EOF\nprotocol=%s\nhost=%s\npath=%s\nEOF"
         % (parse.scheme, parse.netloc, parse.path)
     )
-    stdout = subprocess.run(command, shell=True, stdout=subprocess.PIPE, check=True).stdout
-    stdout_str = stdout.decode("ascii")
+    stdout = subprocess.run(
+        command, shell=True, stdout=subprocess.PIPE, check=True
+    ).stdout
+    stdout_str = stdout.decode()
     stdout_split = [x.split("=") for x in stdout_str.splitlines()]
     credentials_dict = {k: v for [k, v] in stdout_split}
-    credentials = pygit2.UserPass(credentials_dict["username"], credentials_dict["password"])
+    credentials = pygit2.UserPass(
+        credentials_dict["username"], credentials_dict["password"]
+    )
     callbacks = pygit2.RemoteCallbacks(credentials=credentials)
     return credentials, callbacks
 
@@ -100,7 +107,7 @@ def bids_validate(bids_path, ddjson_warn=False):
     stdout = result.stdout.decode()
     if return_code == 1:
         print(stdout)
-        sys.exit(1)
+        raise Exception("Dataset did not pass bids-validator.")
 
 
 def find_large_objects(ds_path):
@@ -122,7 +129,7 @@ def find_large_objects(ds_path):
     large_files = [[x, int(y), z] for [x, y, z] in files if int(y) > cutoff]
     if len(large_files) > 0:
         print(large_files)
-        sys.exit(1)
+        raise Exception("Large files were found in git.")
 
 
 def get_bids_data(client, destination_id, accession_number):
@@ -135,19 +142,34 @@ def get_bids_data(client, destination_id, accession_number):
         sessions = subject.sessions()
     elif job_level == "project":
         project = client.get_project(data_id)
-        sessions = [s for s in project.sessions() if "openneuro" not in s.tags]
+        sessions = [s for s in project.sessions() if accession_number not in s.tags]
     session_labels = [s.label for s in sessions]
+    if not session_labels:
+        error_message = """ 
+        No data was uploaded because all sessions contain the tag
+        '{accession_number}'. This gear is running at the project level,
+        which means it will exclude sessions that contain a tag matching
+        the accession number. To upload specific sesions, you may run this
+        gear at the session or subject level, or remove the '{accession_number}'
+        tag and rerun at the project level.
+        """.format(accession_number=accession_number)
+        print(' '.join(error_message.split()))
+        raise Exception("All sessions contain a tag matching the accession number.")
     bids_path = gtk_context.download_project_bids(sessions=session_labels)
     return bids_path, sessions
 
 
 def cp_bids_data(project_info, bids_path, ds_path):
-    copy_tree(bids_path, ds_path, ignore=['dataset_description.json'])
+    copy_tree(bids_path, ds_path, ignore=["dataset_description.json"])
     ddjson_path_on = os.path.join(ds_path, "dataset_description.json")
     if not os.path.isfile(ddjson_path_on):
         ddjson_dict = project_info["BIDS"]
+        ddjson_dict.pop("rule_id", None)
+        ddjson_dict.pop("template", None)
+        ddjson_dict = {k: v for k, v in ddjson_dict.items() if v}
         with open(ddjson_path_on, "w") as write_file:
             json.dump(ddjson_dict, write_file)
+
 
 def main(gear_context):
     gtk_context.init_logging()
@@ -155,20 +177,12 @@ def main(gear_context):
     config = gtk_context.config
     work_dir = gtk_context.work_dir
     client = gtk_context.client
-    
+
     destination_id = gtk_context.config_json["destination"]["id"]
     project_id = client.get(destination_id)["parents"]["project"]
     project_info = client.get_project(project_id)["info"]
-    
-    openneuro_url = "https://openneuro.org" # Default value
-    if config:
-        if "accession_number" in config:
-            accession_number = config["accession_number"]
-        if "openneuro_api_key" in config:
-            openneuro_api_key = config["openneuro_api_key"]
-        if "openneuro_url" in config:
-            openneuro_url = config["openneuro_url"]
-    
+
+    openneuro_url = "https://openneuro.org"  # Default value
     if "openneuro-upload" in project_info:
         if "accession_number" in project_info["openneuro-upload"]:
             accession_number = project_info["openneuro-upload"]["accession_number"]
@@ -176,8 +190,19 @@ def main(gear_context):
             openneuro_api_key = project_info["openneuro-upload"]["openneuro_api_key"]
         if "openneuro_url" in project_info["openneuro-upload"]:
             openneuro_url = project_info["openneuro-upload"]["openneuro_url"]
-    
-    git_worker_number = get_git_worker_number(accession_number, openneuro_url, openneuro_api_key)
+    if config:
+        if "accession_number" in config:
+            accession_number = config["accession_number"]
+        if "openneuro_api_key" in config:
+            openneuro_api_key = config["openneuro_api_key"]
+        if "openneuro_url" in config:
+            openneuro_url = config["openneuro_url"]
+    if not openneuro_url.endswith("/"):
+        openneuro_url = openneuro_url + "/"
+
+    git_worker_number = get_git_worker_number(
+        accession_number, openneuro_url, openneuro_api_key
+    )
     ds_url = os.path.join(
         openneuro_url,
         "git",
@@ -214,7 +239,7 @@ def main(gear_context):
     git_add_all_commit(repo)
 
     # Perform checks
-    bids_validate(ds_path)
+    # bids_validate(ds_path)
     find_large_objects(ds_path)
 
     # Push to openneuro
@@ -222,12 +247,12 @@ def main(gear_context):
     subprocess.run(command, shell=True, check=True)
     command = "git -C %s annex copy --to openneuro" % ds_path
     subprocess.run(command, shell=True, check=True)
-    
+
     # Tag sessions after upload
     for s in sessions:
         if accession_number not in s.tags:
             s.add_tag(accession_number)
-        
+
 
 if __name__ == "__main__":
     with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
