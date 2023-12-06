@@ -59,6 +59,25 @@
 			"description": "URL of openneuro instance. Default: https://openneuro.org/",
 			"type": "string",
 			"optional": true
+		},
+		"generate_new_dataset": {
+			"description": "If True, the gear will generate a new OpenNeuro dataset and accession number. This will prevent the gear from uploading any data.",
+			"type": "boolean",
+			"default": false
+		},
+		"defaced": {
+			"description": "Required if generating a new dataset. The author must either confirm that all structural scans have been defaced or that proper consent and authorization was obtained to publish them without defacing.",
+			"type": "string",
+			"optional": true,
+			"enum": [
+				"true: all structural scans have been defaced, obscuring any tissue on or near the face that could potentially be used to reconstruct the facial structure.",
+				"false: I have explicit participant consent and ethical authorization to publish structural scans without defacing."
+			]
+		},
+		"copy_to_project_info": {
+			"description": "If True, the gear will copy the OpenNeuro API key, accession number and OpenNeuro URL to project info. Future gear runs will pull these fields so they don't need to be inputted each time.",
+			"type": "boolean",
+			"default": false
 		}
 	},
 	"command": "python run.py"

@@ -20,26 +20,46 @@ FW_PATH = "/flywheel/v0/"
 BIDS_VERSION = "1.9.0"
 
 
-def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
-    data = """
-    {
-        "query":
-            "query {
-                dataset(id: \\"accession_number\\") {
-                    worker
-                }
-            }",
-        "variables": {}
-    }
-    """.replace("\n", "").replace("accession_number", accession_number)
-
+def graphql_query(query, openneuro_url, openneuro_api_key):
     headers = {"Content-Type": "application/json"}
     cookies = {"accessToken": openneuro_api_key}
     url = os.path.join(openneuro_url, "crn/graphql")
+    json={"query": query}
+    response = requests.post(url, headers=headers, json=json, cookies=cookies)
+    return response.json()
 
-    response = requests.post(url, headers=headers, data=data, cookies=cookies)
-    git_worker_number = str(response.json()["data"]["dataset"]["worker"][-1])
+def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
+    query = """
+    query {
+        dataset(id: "accession_number") {
+            worker
+        }
+    }
+    """.replace("accession_number", accession_number)
+
+    response_json = graphql_query(query, openneuro_url, openneuro_api_key)
+    git_worker_number = str(response_json["data"]["dataset"]["worker"][-1])
     return git_worker_number
+    
+
+def new_dataset_query(openneuro_url, openneuro_api_key):
+    try:
+        affirmed_defaced = config["defaced"].split(":")[0]
+    except KeyError:
+        print("'generate_new_dataset' is true but an entry for 'defaced' was not provided.")
+        sys.exit(1)
+        
+    query = """
+    mutation {
+      createDataset(affirmedDefaced: affirmed_defaced) {
+        id
+      }
+    }
+    """.replace("affirmed_defaced", affirmed_defaced)
+    
+    response_json = graphql_query(query, openneuro_url, openneuro_api_key)  
+    accession_number = response_json["data"]["createDataset"]["id"]
+    return accession_number
 
 
 def copy_tree(src, dst, ignore=[]):
@@ -132,7 +152,7 @@ def find_large_objects(ds_path):
         raise Exception("Large files were found in git.")
 
 
-def get_bids_data(client, destination_id, accession_number):
+def get_bids_data(accession_number):
     job_level = client.get(destination_id)["parent"]["type"]
     data_id = client.get(destination_id)["parents"][job_level]
     if job_level == "session":
@@ -159,7 +179,7 @@ def get_bids_data(client, destination_id, accession_number):
     return bids_path, sessions
 
 
-def cp_bids_data(project_info, bids_path, ds_path):
+def cp_bids_data(bids_path, ds_path):
     copy_tree(bids_path, ds_path, ignore=["dataset_description.json"])
     ddjson_path_on = os.path.join(ds_path, "dataset_description.json")
     if not os.path.isfile(ddjson_path_on):
@@ -170,19 +190,8 @@ def cp_bids_data(project_info, bids_path, ds_path):
         with open(ddjson_path_on, "w") as write_file:
             json.dump(ddjson_dict, write_file)
 
-
-def main(gear_context):
-    gtk_context.init_logging()
-    gtk_context.log_config()
-    config = gtk_context.config
-    work_dir = gtk_context.work_dir
-    client = gtk_context.client
-
-    destination_id = gtk_context.config_json["destination"]["id"]
-    project_id = client.get(destination_id)["parents"]["project"]
-    project_info = client.get_project(project_id)["info"]
-
-    openneuro_url = "https://openneuro.org"  # Default value
+def get_config():
+    openneuro_url = "https://openneuro.org" # Default value
     if "openneuro-upload" in project_info:
         if "accession_number" in project_info["openneuro-upload"]:
             accession_number = project_info["openneuro-upload"]["accession_number"]
@@ -199,7 +208,11 @@ def main(gear_context):
             openneuro_url = config["openneuro_url"]
     if not openneuro_url.endswith("/"):
         openneuro_url = openneuro_url + "/"
+    if config["generate_new_dataset"]:
+        accession_number = None
+    return accession_number, openneuro_api_key, openneuro_url
 
+def upload(accession_number, openneuro_api_key, openneuro_url):
     git_worker_number = get_git_worker_number(
         accession_number, openneuro_url, openneuro_api_key
     )
@@ -219,7 +232,7 @@ def main(gear_context):
         json.dump(openneuro_config_dict, write_file)
 
     # Validate flywheel data
-    bids_path, sessions = get_bids_data(client, destination_id, accession_number)
+    bids_path, sessions = get_bids_data(accession_number)
     bids_validate(bids_path, ddjson_warn=True)
 
     # Setup openneuro dataset
@@ -233,7 +246,7 @@ def main(gear_context):
     subprocess.run(command, shell=True, check=True)
 
     # Add new data
-    cp_bids_data(project_info, bids_path, ds_path)
+    cp_bids_data(bids_path, ds_path)
     command = "git -C %s annex add ." % ds_path
     subprocess.run(command, shell=True, check=True)
     git_add_all_commit(repo)
@@ -252,8 +265,43 @@ def main(gear_context):
     for s in sessions:
         if accession_number not in s.tags:
             s.add_tag(accession_number)
+            
+    return project_id, accession_number, openneuro_api_key
+    
+def update_project_info(accession_number, openneuro_api_key, openneuro_url):
+    new_info = {
+        "openneuro-upload": {
+            "accession_number": accession_number,
+            "openneuro_api_key": openneuro_api_key,
+            "openneuro_url": openneuro_url
+        }
+    }
+    
+    project = gtk_context.client.get_project(project_id)
+    project.update_info(new_info)
 
-
+def main():
+    gtk_context.init_logging()
+    gtk_context.log_config()
+    
+    accession_number, openneuro_api_key, openneuro_url = get_config()
+    
+    if gtk_context.config["generate_new_dataset"]:
+        accession_number = new_dataset_query(config,openneuro_url, openneuro_api_key)
+    else:
+        upload(accession_number, openneuro_api_key, openneuro_url)
+    
+    if gtk_context.config["copy_to_project_info"]:
+        update_project_info(accession_number, openneuro_api_key, openneuro_url)
+        
 if __name__ == "__main__":
     with flywheel_gear_toolkit.GearToolkitContext() as gtk_context:
-        main(gtk_context)
+        config = gtk_context.config
+        work_dir = gtk_context.work_dir
+        client = gtk_context.client
+
+        destination_id = gtk_context.config_json["destination"]["id"]
+        project_id = client.get(destination_id)["parents"]["project"]
+        project_info = client.get_project(project_id)["info"]
+        
+        main()
