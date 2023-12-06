@@ -287,7 +287,8 @@ def main():
     accession_number, openneuro_api_key, openneuro_url = get_config()
     
     if gtk_context.config["generate_new_dataset"]:
-        accession_number = new_dataset_query(config,openneuro_url, openneuro_api_key)
+        accession_number = new_dataset_query(openneuro_url, openneuro_api_key)
+        print("Generated new OpenNeuro accession number: %s" % accession_number)
     else:
         upload(accession_number, openneuro_api_key, openneuro_url)
     
