@@ -127,7 +127,7 @@ def bids_validate(bids_path, ddjson_warn=False):
     stdout = result.stdout.decode()
     if return_code == 1:
         print(stdout)
-        raise Exception("Dataset did not pass bids-validator.")
+        sys.exit(1)
 
 
 def find_large_objects(ds_path):
@@ -165,16 +165,20 @@ def get_bids_data(accession_number):
         sessions = [s for s in project.sessions() if accession_number not in s.tags]
     session_labels = [s.label for s in sessions]
     if not session_labels:
-        error_message = """ 
-        No data was uploaded because all sessions contain the tag
-        '{accession_number}'. This gear is running at the project level,
-        which means it will exclude sessions that contain a tag matching
-        the accession number. To upload specific sesions, you may run this
-        gear at the session or subject level, or remove the '{accession_number}'
-        tag and rerun at the project level.
-        """.format(accession_number=accession_number)
-        print(' '.join(error_message.split()))
-        raise Exception("All sessions contain a tag matching the accession number.")
+        if not gtk_context.get_input_path("dataset_description"):
+            error_message = """ 
+            No data was uploaded because either:
+            1) No bidsified data was found
+            2) All sessions contain the tag '{accession_number}'. This gear is 
+            running at the project level, which means it will exclude sessions 
+            that contain a tag matching the accession number. To upload specific 
+            sessions, you may run this gear at the session or subject level, or 
+            remove the '{accession_number}' tag and rerun at the project level.
+            """.format(accession_number=accession_number)
+            print(' '.join(error_message.split()))
+            sys.exit(1)
+        else:
+            return None, sessions
     bids_path = gtk_context.download_project_bids(sessions=session_labels)
     return bids_path, sessions
 
@@ -182,7 +186,12 @@ def get_bids_data(accession_number):
 def cp_bids_data(bids_path, ds_path):
     copy_tree(bids_path, ds_path, ignore=["dataset_description.json"])
     ddjson_path_on = os.path.join(ds_path, "dataset_description.json")
-    if not os.path.isfile(ddjson_path_on):
+    ddjson_path_fw = gtk_context.get_input_path("dataset_description")
+    if ddjson_path_fw:
+        with contextlib.suppress(FileNotFoundError):
+            os.remove(ddjson_path_on)
+        shutil.copyfile(ddjson_path_fw, ddjson_path_on)
+    elif not os.path.isfile(ddjson_path_on):
         ddjson_dict = project_info["BIDS"]
         ddjson_dict.pop("rule_id", None)
         ddjson_dict.pop("template", None)
@@ -233,7 +242,8 @@ def upload(accession_number, openneuro_api_key, openneuro_url):
 
     # Validate flywheel data
     bids_path, sessions = get_bids_data(accession_number)
-    bids_validate(bids_path, ddjson_warn=True)
+    if bids_path:
+        bids_validate(bids_path, ddjson_warn=True)
 
     # Setup openneuro dataset
     credentials, callbacks = openneuro_callbacks(ds_url)
@@ -286,12 +296,11 @@ def main():
     
     accession_number, openneuro_api_key, openneuro_url = get_config()
     
-    if gtk_context.config["generate_new_dataset"]:
+    if config["generate_new_dataset"]:
         accession_number = new_dataset_query(openneuro_url, openneuro_api_key)
         print("Generated new OpenNeuro accession number: %s" % accession_number)
-    else:
+    if not config["skip_upload"]:
         upload(accession_number, openneuro_api_key, openneuro_url)
-    
     if gtk_context.config["copy_to_project_info"]:
         update_project_info(accession_number, openneuro_api_key, openneuro_url)
         

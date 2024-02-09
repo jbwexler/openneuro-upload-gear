@@ -1,6 +1,6 @@
 {
 	"name": "openneuro-upload",
-	"label": "Openneuro Uploader",
+	"label": "OpenNeuro Uploader",
 	"description": "Uploads BIDS data to openneuro.org",
 	"version": "0.1.20",
 	"author": "Joe Wexler",
@@ -42,6 +42,16 @@
 	"inputs": {
 		"key": {
 			"base": "api-key"
+		},
+		"dataset_description": {
+			"description": "An optional dataset_description.json to be uploaded to OpenNeuro. This will be prioritized over other sources of dataset_description.json files and will overwrite an existing copy on openneuro.org.",
+			"base": "file",
+			"type": {
+				"enum": [
+					"text"
+				]
+			},
+			"optional": true
 		}
 	},
 	"config": {
@@ -60,13 +70,18 @@
 			"type": "string",
 			"optional": true
 		},
+		"skip_upload": {
+			"description": "If True, the gear will not attempt to upload any data. This may be useful when trying to generate a new OpenNeuro Dataset without actually uploading any data.",
+			"type": "boolean",
+			"default": false
+		},
 		"generate_new_dataset": {
 			"description": "If True, the gear will generate a new OpenNeuro dataset and accession number. This will prevent the gear from uploading any data.",
 			"type": "boolean",
 			"default": false
 		},
 		"defaced": {
-			"description": "Required if generating a new dataset. The author must either confirm that all structural scans have been defaced or that proper consent and authorization was obtained to publish them without defacing.",
+			"description": "Required if generate_new_dataset is true.\nTrue: all structural scans have been defaced, obscuring any tissue on or near the face that could potentially be used to reconstruct the facial structure.\nFalse: I have explicit participant consent and ethical authorization to publish structural scans without defacing.",
 			"type": "string",
 			"optional": true,
 			"enum": [
