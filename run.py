@@ -13,6 +13,7 @@ import contextlib
 import requests
 from urllib.parse import urlparse
 
+
 log = logging.getLogger(__name__)
 
 FW_PATH = "/flywheel/v0/"
@@ -83,16 +84,17 @@ def copy_tree(src, dst, ignore=[]):
 
 def openneuro_callbacks(ds_url, env):
     parse = urlparse(ds_url)
-    command = (
-        "openneuro git-credential get <<EOF\nprotocol=%s\nhost=%s\npath=%s\nEOF"
-        % (parse.scheme, parse.netloc, parse.path)
-    )
     stdout = subprocess.run(
-        command, shell=True, stdout=subprocess.PIPE, check=True, env=env
+        "openneuro git-credential get <<EOF\nprotocol=%s\nhost=%s\npath=%s\nEOF"
+        % (parse.scheme, parse.netloc, parse.path),
+        shell=True,
+        stdout=subprocess.PIPE,
+        check=True,
+        env=env,
     ).stdout
     stdout_str = stdout.decode()
-    stdout_pairs = [p for p in stdout_str.split('\n') if '=' in p]
-    credentials_dict = dict(p.split('=', 1) for p in stdout_pairs)
+    stdout_pairs = [p for p in stdout_str.split("\n") if "=" in p]
+    credentials_dict = dict(p.split("=", 1) for p in stdout_pairs)
     credentials = pygit2.UserPass(
         credentials_dict["username"], credentials_dict["password"]
     )
@@ -123,8 +125,11 @@ def bids_validate(bids_path, ddjson_warn=False):
     else:
         config_path = os.path.join(FW_PATH, "bids-validator-config_ddjson-err.json")
 
-    command = "bids-validator %s -c %s" % (bids_path, config_path)
-    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE)
+    result = subprocess.run(
+        "bids-validator %s -c %s" % (bids_path, config_path),
+        shell=True,
+        stdout=subprocess.PIPE,
+    )
     return_code = result.returncode
     stdout = result.stdout.decode()
     if return_code == 1:
@@ -168,13 +173,13 @@ def get_bids_data(accession_number):
     session_labels = [s.label for s in sessions]
     if not session_labels:
         if not gtk_context.get_input_path("dataset_description"):
-            error_message = """ 
+            error_message = """
             No data was uploaded because either:
             1) No bidsified data was found
-            2) All sessions contain the tag '{accession_number}'. This gear is 
-            running at the project level, which means it will exclude sessions 
-            that contain a tag matching the accession number. To upload specific 
-            sessions, you may run this gear at the session or subject level, or 
+            2) All sessions contain the tag '{accession_number}'. This gear is
+            running at the project level, which means it will exclude sessions
+            that contain a tag matching the accession number. To upload specific
+            sessions, you may run this gear at the session or subject level, or
             remove the '{accession_number}' tag and rerun at the project level.
             """.format(accession_number=accession_number)
             print(" ".join(error_message.split()))
@@ -186,7 +191,8 @@ def get_bids_data(accession_number):
 
 
 def cp_bids_data(bids_path, ds_path):
-    copy_tree(bids_path, ds_path, ignore=["dataset_description.json"])
+    if bids_path:
+        copy_tree(bids_path, ds_path, ignore=["dataset_description.json"])
     ddjson_path_on = os.path.join(ds_path, "dataset_description.json")
     ddjson_path_fw = gtk_context.get_input_path("dataset_description")
     if ddjson_path_fw:
@@ -247,27 +253,30 @@ def upload(accession_number, openneuro_api_key, openneuro_url, env):
     credentials, callbacks = openneuro_callbacks(ds_url, env)
     repo = pygit2.clone_repository(ds_url, ds_path, callbacks=callbacks)
     repo.remotes["origin"].fetch(["git-annex:git-annex"], callbacks=callbacks)
-    command = (
+    subprocess.run(
         "git -C %s annex initremote openneuro type=external externaltype=openneuro encryption=none url=%s"
-        % (ds_path, ds_url)
+        % (ds_path, ds_url),
+        shell=True,
+        check=True,
+        env=env,
     )
-    subprocess.run(command, shell=True, check=True, env=env)
 
     # Add new data
     cp_bids_data(bids_path, ds_path)
-    command = "git -C %s annex add ." % ds_path
-    subprocess.run(command, shell=True, check=True, env=env)
+    subprocess.run("git -C %s annex add ." % ds_path, shell=True, check=True, env=env)
     git_add_all_commit(repo)
 
     # Perform checks
-    # bids_validate(ds_path)
+    bids_validate(ds_path)
     find_large_objects(ds_path)
 
     # Push to openneuro
-    breakpoint()
-    repo.remotes["origin"].push(["refs/heads/main:refs/heads/main"], callbacks=callbacks)
-    command = "git -C %s annex copy --to openneuro" % ds_path
-    subprocess.run(command, shell=True, check=True, env=env)
+    subprocess.run(
+        "git -C %s push origin main" % ds_path, shell=True, check=True, env=env
+    )
+    subprocess.run(
+        "git -C %s annex copy --to openneuro" % ds_path, shell=True, check=True, env=env
+    )
 
     # Tag sessions after upload
     for s in sessions:
@@ -298,7 +307,9 @@ def main():
     env = os.environ.copy()
     env["OPENNEURO_API_KEY"] = openneuro_api_key
     env["OPENNEURO_URL"] = openneuro_url
-    subprocess.run("openneuro login --error-reporting true", shell=True, check=True, env=env)
+    subprocess.run(
+        "openneuro login --error-reporting true", shell=True, check=True, env=env
+    )
 
     if config["generate_new_dataset"]:
         accession_number = new_dataset_query(openneuro_url, openneuro_api_key)
