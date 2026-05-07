@@ -1,4 +1,4 @@
-FROM mambaorg/micromamba:1.5.1
+FROM mambaorg/micromamba:2.5.0
 USER root
 
 COPY env.yaml /tmp/env.yaml
@@ -21,10 +21,16 @@ RUN apt-get update && \
 ENV FLYWHEEL=/flywheel/v0
 COPY package.json ${FLYWHEEL}/package.json
 WORKDIR ${FLYWHEEL}
+
+COPY --from=denoland/deno:bin-2.7.13 /deno /usr/local/bin/deno
+ENV PATH="/root/.deno/bin:$PATH"
 ENV PATH="/opt/conda/envs/openneuro-upload/bin:$PATH"
-RUN /opt/conda/envs/openneuro-upload/bin/npm install && \
-	rm -r ~/.npm
-ENV PATH="${FLYWHEEL}/node_modules/.bin:$PATH"
+RUN deno install -A --global jsr:@openneuro/cli -n openneuro
+RUN deno install -A --global jsr:@bids/validator -n bids-validator
+
+RUN curl https://raw.githubusercontent.com/OpenNeuroOrg/openneuro/refs/heads/master/bin/git-annex-remote-openneuro -o /usr/local/bin/git-annex-remote-openneuro && \
+    chmod +x /usr/local/bin/git-annex-remote-openneuro
+
 COPY requirements.txt /tmp/requirements.txt
 RUN /opt/conda/envs/openneuro-upload/bin/pip install --no-cache-dir -r /tmp/requirements.txt
 
