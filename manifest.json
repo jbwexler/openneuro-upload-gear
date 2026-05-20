@@ -2,7 +2,7 @@
 	"name": "openneuro-upload",
 	"label": "OpenNeuro Uploader",
 	"description": "Uploads BIDS data to openneuro.org",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"author": "Joe Wexler",
 	"maintainer": "Joe Wexler",
 	"cite": "",
@@ -33,7 +33,7 @@
 	"custom": {
 		"gear-builder": {
 			"category": "analysis",
-			"image": "jbwexler/openneuro-upload:0.2.0"
+			"image": "jbwexler/openneuro-upload:0.3.0"
 		},
 		"flywheel": {
 			"suite": "OpenNeuro"
