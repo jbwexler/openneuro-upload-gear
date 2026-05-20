@@ -198,6 +198,85 @@ def get_bids_data(accession_number):
     return bids_path, sessions
 
 
+def strip_sessions(ds_path):
+    """Remove the session level from the BIDS structure under ds_path.
+
+    Moves files from sub-XX/ses-YY/<modality>/ up to sub-XX/<modality>/ and strips
+    _ses-YY tokens from filenames. Exits with an error if any subject has more
+    than one session, or if any subject-level sessions.tsv/.json files exist
+    (the user must resolve those manually before stripping).
+    """
+    subjects = sorted(
+        d
+        for d in os.listdir(ds_path)
+        if d.startswith("sub-") and os.path.isdir(os.path.join(ds_path, d))
+    )
+
+    multi_session = []
+    sessions_files = []
+    for subj in subjects:
+        subj_dir = os.path.join(ds_path, subj)
+        sessions = sorted(
+            d
+            for d in os.listdir(subj_dir)
+            if d.startswith("ses-") and os.path.isdir(os.path.join(subj_dir, d))
+        )
+        if len(sessions) > 1:
+            multi_session.append((subj, sessions))
+        for fname in os.listdir(subj_dir):
+            if fname.endswith("_sessions.tsv") or fname.endswith("_sessions.json"):
+                sessions_files.append(os.path.join(subj, fname))
+
+    fail = False
+    if multi_session:
+        formatted = "\n".join(
+            "  %s: %s" % (subj, ", ".join(ses)) for subj, ses in multi_session
+        )
+        log.error(
+            "Cannot strip sessions: %d subject(s) have more than one session, which "
+            "would cause filename collisions after flattening. Affected subjects:\n%s",
+            len(multi_session),
+            formatted,
+        )
+        fail = True
+    if sessions_files:
+        log.error(
+            "Cannot strip sessions: found %d subject-level sessions file(s). Remove "
+            "or relocate them before enabling strip_sessions:\n%s",
+            len(sessions_files),
+            "\n".join("  " + p for p in sessions_files),
+        )
+        fail = True
+    if fail:
+        sys.exit(1)
+
+    log.info("Stripping session level from %d subject(s) under %s", len(subjects), ds_path)
+
+    for subj in subjects:
+        subj_dir = os.path.join(ds_path, subj)
+        sessions = [
+            d
+            for d in os.listdir(subj_dir)
+            if d.startswith("ses-") and os.path.isdir(os.path.join(subj_dir, d))
+        ]
+        if not sessions:
+            continue
+
+        ses_label = sessions[0]
+        ses_dir = os.path.join(subj_dir, ses_label)
+        ses_token = "_" + ses_label
+
+        for root, _dirs, files in os.walk(ses_dir):
+            rel = os.path.relpath(root, ses_dir)
+            target_root = subj_dir if rel == "." else os.path.join(subj_dir, rel)
+            os.makedirs(target_root, exist_ok=True)
+            for f in files:
+                new_name = f.replace(ses_token, "")
+                shutil.move(os.path.join(root, f), os.path.join(target_root, new_name))
+
+        shutil.rmtree(ses_dir)
+
+
 def cp_bids_data(bids_path, ds_path):
     if bids_path:
         copy_tree(bids_path, ds_path, ignore=["dataset_description.json"])
@@ -271,6 +350,8 @@ def upload(accession_number, openneuro_api_key, openneuro_url, env):
 
     # Add new data
     cp_bids_data(bids_path, ds_path)
+    if config["strip_sessions"]:
+        strip_sessions(ds_path)
     subprocess.run("git -C %s annex add ." % ds_path, shell=True, check=True, env=env)
     git_add_all_commit(repo)
 

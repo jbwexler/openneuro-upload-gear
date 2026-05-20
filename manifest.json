@@ -93,6 +93,11 @@
 			"description": "If True, the gear will copy the OpenNeuro API key, accession number and OpenNeuro URL to project info. Future gear runs will pull these fields so they don't need to be inputted each time.",
 			"type": "boolean",
 			"default": false
+		},
+		"strip_sessions": {
+			"description": "If True, the gear will remove the session level from the BIDS directory structure and from filenames (sub-XX/ses-YY/<modality>/sub-XX_ses-YY_*.* -> sub-XX/<modality>/sub-XX_*.*). Errors out if any subject has more than one session (filename collisions would result) or if any subject-level sessions.tsv/.json files exist (resolve those manually before enabling).",
+			"type": "boolean",
+			"default": false
 		}
 	},
 	"command": "python run.py"
