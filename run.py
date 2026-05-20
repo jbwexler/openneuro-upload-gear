@@ -17,7 +17,6 @@ from urllib.parse import urlparse
 log = logging.getLogger(__name__)
 
 FW_PATH = "/flywheel/v0/"
-BIDS_VERSION = "1.9.0"
 
 
 def graphql_query(query, openneuro_url, openneuro_api_key):
@@ -48,8 +47,10 @@ def new_dataset_query(openneuro_url, openneuro_api_key):
     try:
         affirmed_defaced = config["defaced"].split(":")[0]
     except KeyError:
-        print(
-            "'generate_new_dataset' is true but an entry for 'defaced' was not provided."
+        log.error(
+            "'generate_new_dataset' is enabled but the 'defaced' config field was not "
+            "provided. Set 'defaced' to indicate whether the dataset has been defaced "
+            "before creating a new dataset."
         )
         sys.exit(1)
 
@@ -133,7 +134,7 @@ def bids_validate(bids_path, ddjson_warn=False):
     return_code = result.returncode
     stdout = result.stdout.decode()
     if return_code == 1:
-        print(stdout)
+        log.error("BIDS validation failed for %s:\n%s", bids_path, stdout)
         sys.exit(1)
 
 
@@ -155,8 +156,16 @@ def find_large_objects(ds_path):
     files = [x.split() for x in stdout.splitlines()]
     large_files = [[x, int(y), z] for [x, y, z] in files if int(y) > cutoff]
     if len(large_files) > 0:
-        print(large_files)
-        raise Exception("Large files were found in git.")
+        formatted = "\n".join(
+            "  %s  %d bytes  %s" % (sha, size, name) for sha, size, name in large_files
+        )
+        log.error(
+            "Found %d file(s) larger than 10MB tracked in git. Remove them from history "
+            "before uploading:\n%s",
+            len(large_files),
+            formatted,
+        )
+        sys.exit(1)
 
 
 def get_bids_data(accession_number):
@@ -173,16 +182,15 @@ def get_bids_data(accession_number):
     session_labels = [s.label for s in sessions]
     if not session_labels:
         if not gtk_context.get_input_path("dataset_description"):
-            error_message = """
-            No data was uploaded because either:
-            1) No bidsified data was found
-            2) All sessions contain the tag '{accession_number}'. This gear is
-            running at the project level, which means it will exclude sessions
-            that contain a tag matching the accession number. To upload specific
-            sessions, you may run this gear at the session or subject level, or
-            remove the '{accession_number}' tag and rerun at the project level.
-            """.format(accession_number=accession_number)
-            print(" ".join(error_message.split()))
+            log.error(
+                "No sessions available to upload. Either no BIDS data was found, or "
+                "every session is already tagged with the accession number '%s'. When "
+                "this gear runs at the project level, it skips sessions tagged with the "
+                "accession number; to upload specific sessions, rerun at the session or "
+                "subject level, or remove the '%s' tag and rerun at the project level.",
+                accession_number,
+                accession_number,
+            )
             sys.exit(1)
         else:
             return None, sessions
@@ -313,7 +321,7 @@ def main():
 
     if config["generate_new_dataset"]:
         accession_number = new_dataset_query(openneuro_url, openneuro_api_key)
-        print("Generated new OpenNeuro accession number: %s" % accession_number)
+        log.info("Generated new OpenNeuro accession number: %s", accession_number)
     if not config["skip_upload"]:
         upload(accession_number, openneuro_api_key, openneuro_url, env)
     if gtk_context.config["copy_to_project_info"]:
