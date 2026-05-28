@@ -250,7 +250,9 @@ def strip_sessions(ds_path):
     if fail:
         sys.exit(1)
 
-    log.info("Stripping session level from %d subject(s) under %s", len(subjects), ds_path)
+    log.info(
+        "Stripping session level from %d subject(s) under %s", len(subjects), ds_path
+    )
 
     for subj in subjects:
         subj_dir = os.path.join(ds_path, subj)
@@ -296,20 +298,23 @@ def cp_bids_data(bids_path, ds_path):
 
 
 def get_config():
-    openneuro_url = "https://openneuro.org"  # Default value
+    accession_number = None
+    openneuro_api_key = None
+    openneuro_url = "https://openneuro.org"
     if "openneuro-upload" in project_info:
-        if "accession_number" in project_info["openneuro-upload"]:
-            accession_number = project_info["openneuro-upload"]["accession_number"]
-        if "openneuro_api_key" in project_info["openneuro-upload"]:
-            openneuro_api_key = project_info["openneuro-upload"]["openneuro_api_key"]
-        if "openneuro_url" in project_info["openneuro-upload"]:
-            openneuro_url = project_info["openneuro-upload"]["openneuro_url"]
+        pi = project_info["openneuro-upload"]
+        if pi.get("accession_number"):
+            accession_number = pi["accession_number"]
+        if pi.get("openneuro_api_key"):
+            openneuro_api_key = pi["openneuro_api_key"]
+        if pi.get("openneuro_url"):
+            openneuro_url = pi["openneuro_url"]
     if config:
-        if "accession_number" in config:
+        if config.get("accession_number"):
             accession_number = config["accession_number"]
-        if "openneuro_api_key" in config:
+        if config.get("openneuro_api_key"):
             openneuro_api_key = config["openneuro_api_key"]
-        if "openneuro_url" in config:
+        if config.get("openneuro_url"):
             openneuro_url = config["openneuro_url"]
     openneuro_url = openneuro_url.rstrip("/")
     if config["generate_new_dataset"]:
