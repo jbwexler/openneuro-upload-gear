@@ -300,7 +300,7 @@ def cp_bids_data(bids_path, ds_path):
 def get_config():
     accession_number = None
     openneuro_api_key = None
-    openneuro_url = "https://openneuro.org"
+    openneuro_url = None
     if "openneuro-upload" in project_info:
         pi = project_info["openneuro-upload"]
         if pi.get("accession_number"):
@@ -316,7 +316,8 @@ def get_config():
             openneuro_api_key = config["openneuro_api_key"]
         if config.get("openneuro_url"):
             openneuro_url = config["openneuro_url"]
-    openneuro_url = openneuro_url.rstrip("/")
+    if openneuro_url:
+        openneuro_url = openneuro_url.rstrip("/")
     if config["generate_new_dataset"]:
         accession_number = None
     return accession_number, openneuro_api_key, openneuro_url

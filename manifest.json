@@ -7,8 +7,8 @@
 	"maintainer": "Joe Wexler",
 	"cite": "",
 	"license": "MIT",
-	"url": "",
-	"source": "",
+	"url": "https://github.com/jbwexler/openneuro-upload-gear",
+	"source": "https://github.com/jbwexler/openneuro-upload-gear",
 	"environment": {
 		"FLYWHEEL": "/flywheel/v0",
 		"MAMBA_USER_ID": "57439",
@@ -44,11 +44,11 @@
 			"base": "api-key"
 		},
 		"dataset_description": {
-			"description": "An optional dataset_description.json to be uploaded to OpenNeuro. This will be prioritized over other sources of dataset_description.json files and will overwrite an existing copy on openneuro.org.",
+			"description": "An optional dataset_description.json to be uploaded to OpenNeuro. This will be prioritized over other sources of dataset_description.json files and will overwrite an existing copy on openneuro.org. Providing this input also allows the gear to run even when no sessions are available for upload (e.g. to patch just the dataset_description.json on an existing dataset).",
 			"base": "file",
 			"type": {
 				"enum": [
-					"text"
+					"json"
 				]
 			},
 			"optional": true
@@ -56,7 +56,7 @@
 	},
 	"config": {
 		"accession_number": {
-			"description": "Accession number of the OpenNeuro dataset to upload to.",
+			"description": "Accession number of the OpenNeuro dataset to upload to. Leave blank if generating a new dataset.",
 			"type": "string",
 			"optional": true
 		},
@@ -66,9 +66,10 @@
 			"optional": true
 		},
 		"openneuro_url": {
-			"description": "URL of openneuro instance. Default: https://openneuro.org/",
+			"description": "URL of openneuro instance.",
 			"type": "string",
-			"optional": true
+			"optional": true,
+			"default": "https://openneuro.org"
 		},
 		"skip_upload": {
 			"description": "If True, the gear will not attempt to upload any data. This may be useful when trying to generate a new OpenNeuro Dataset without actually uploading any data.",
@@ -76,7 +77,7 @@
 			"default": false
 		},
 		"generate_new_dataset": {
-			"description": "If True, the gear will generate a new OpenNeuro dataset and accession number. This will prevent the gear from uploading any data.",
+			"description": "If True, the gear will generate a new OpenNeuro dataset and accession number. Requires 'defaced' to be set.",
 			"type": "boolean",
 			"default": false
 		},
