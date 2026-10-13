@@ -28,7 +28,7 @@
 		"SHLVL": "1",
 		"CONDA_DEFAULT_ENV": "base",
 		"LC_ALL": "C.UTF-8",
-		"PATH": "/opt/conda/bin:/opt/conda/condabin:/flywheel/v0/node_modules/.bin:/opt/conda/envs/openneuro-upload/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+		"PATH": "/root/.deno/bin:/opt/conda/bin:/opt/conda/condabin:/opt/conda/envs/openneuro-upload/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 	},
 	"custom": {
 		"gear-builder": {
@@ -60,15 +60,9 @@
 			"type": "string",
 			"optional": true
 		},
-		"openneuro_api_key": {
-			"description": "OpenNeuro API key",
-			"type": "string",
-			"optional": true
-		},
 		"openneuro_url": {
 			"description": "URL of openneuro instance.",
 			"type": "string",
-			"optional": true,
 			"default": "https://openneuro.org"
 		},
 		"skip_upload": {
@@ -91,7 +85,7 @@
 			]
 		},
 		"copy_to_project_info": {
-			"description": "If True, the gear will copy the OpenNeuro API key, accession number and OpenNeuro URL to project info. Future gear runs will pull these fields so they don't need to be inputted each time.",
+			"description": "If True, the gear will copy the accession number and OpenNeuro URL to project info. Future gear runs will pull these fields so they don't need to be inputted each time.",
 			"type": "boolean",
 			"default": false
 		},

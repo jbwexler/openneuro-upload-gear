@@ -298,29 +298,24 @@ def cp_bids_data(bids_path, ds_path):
 
 
 def get_config():
-    accession_number = None
-    openneuro_api_key = None
-    openneuro_url = None
+    accession_number = ""
+    openneuro_url = ""
     if "openneuro-upload" in project_info:
         pi = project_info["openneuro-upload"]
         if pi.get("accession_number"):
             accession_number = pi["accession_number"]
-        if pi.get("openneuro_api_key"):
-            openneuro_api_key = pi["openneuro_api_key"]
         if pi.get("openneuro_url"):
             openneuro_url = pi["openneuro_url"]
     if config:
         if config.get("accession_number"):
             accession_number = config["accession_number"]
-        if config.get("openneuro_api_key"):
-            openneuro_api_key = config["openneuro_api_key"]
         if config.get("openneuro_url"):
             openneuro_url = config["openneuro_url"]
     if openneuro_url:
         openneuro_url = openneuro_url.rstrip("/")
     if config["generate_new_dataset"]:
         accession_number = None
-    return accession_number, openneuro_api_key, openneuro_url
+    return accession_number, openneuro_url
 
 
 def upload(accession_number, openneuro_api_key, openneuro_url, env):
@@ -378,14 +373,13 @@ def upload(accession_number, openneuro_api_key, openneuro_url, env):
         if accession_number not in s.tags:
             s.add_tag(accession_number)
 
-    return project_id, accession_number, openneuro_api_key
+    return project_id, accession_number
 
 
-def update_project_info(accession_number, openneuro_api_key, openneuro_url):
+def update_project_info(accession_number, openneuro_url):
     new_info = {
         "openneuro-upload": {
             "accession_number": accession_number,
-            "openneuro_api_key": openneuro_api_key,
             "openneuro_url": openneuro_url,
         }
     }
@@ -398,9 +392,15 @@ def main():
     gtk_context.init_logging()
     gtk_context.log_config()
 
-    accession_number, openneuro_api_key, openneuro_url = get_config()
+    accession_number, openneuro_url = get_config()
+    openneuro_api_key = os.environ.get("OPENNEURO_API_KEY")
+    if not openneuro_api_key:
+        log.error(
+            "OPENNEURO_API_KEY environment variable is not set. Please reach out to "
+            "Flywheel to have this secret key added to the gear's environment."
+        )
+        sys.exit(1)
     env = os.environ.copy()
-    env["OPENNEURO_API_KEY"] = openneuro_api_key
     env["OPENNEURO_URL"] = openneuro_url
     subprocess.run(
         "openneuro login --error-reporting true", shell=True, check=True, env=env
@@ -412,7 +412,7 @@ def main():
     if not config["skip_upload"]:
         upload(accession_number, openneuro_api_key, openneuro_url, env)
     if gtk_context.config["copy_to_project_info"]:
-        update_project_info(accession_number, openneuro_api_key, openneuro_url)
+        update_project_info(accession_number, openneuro_url)
 
 
 if __name__ == "__main__":
