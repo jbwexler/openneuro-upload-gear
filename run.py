@@ -26,7 +26,11 @@ def graphql_query(query, openneuro_url, openneuro_api_key):
     response = requests.post(
         url, headers=headers, json={"query": query}, cookies=cookies
     )
-    return response.json()
+    result = response.json()
+    if result.get("errors"):
+        log.error("GraphQL request to %s returned errors: %r", url, result["errors"])
+        sys.exit(1)
+    return result
 
 
 def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
@@ -39,7 +43,15 @@ def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
     """.replace("accession_number", accession_number)
 
     response_json = graphql_query(query, openneuro_url, openneuro_api_key)
-    git_worker_number = str(response_json["data"]["dataset"]["worker"][-1])
+    dataset = response_json["data"]["dataset"]
+    if dataset is None:
+        log.error(
+            "OpenNeuro returned no dataset for accession '%s'. The dataset may not "
+            "exist, may be private, or the OPENNEURO_API_KEY may lack access to it.",
+            accession_number,
+        )
+        sys.exit(1)
+    git_worker_number = dataset["worker"].rsplit("-", 1)[-1]
     return git_worker_number
 
 
