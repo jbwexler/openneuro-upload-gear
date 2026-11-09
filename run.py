@@ -6,7 +6,6 @@ import shutil
 import os.path
 import os
 import pygit2
-import json
 import subprocess
 import sys
 import contextlib
@@ -311,20 +310,22 @@ def strip_sessions(ds_path):
 
 def cp_bids_data(bids_path, ds_path):
     if bids_path:
-        copy_tree(bids_path, ds_path, ignore=["dataset_description.json"])
-    ddjson_path_on = os.path.join(ds_path, "dataset_description.json")
+        copy_tree(
+            bids_path,
+            ds_path,
+            ignore=[
+                "dataset_description.json",
+                "README",
+                "README.md",
+                "README.rst",
+                "README.txt",
+            ],
+        )
     ddjson_path_fw = gtk_context.get_input_path("dataset_description")
     if ddjson_path_fw:
-        with contextlib.suppress(FileNotFoundError):
-            os.remove(ddjson_path_on)
-        shutil.copyfile(ddjson_path_fw, ddjson_path_on)
-    elif not os.path.isfile(ddjson_path_on):
-        ddjson_dict = project_info["BIDS"]
-        ddjson_dict.pop("rule_id", None)
-        ddjson_dict.pop("template", None)
-        ddjson_dict = {k: v for k, v in ddjson_dict.items() if v}
-        with open(ddjson_path_on, "w") as write_file:
-            json.dump(ddjson_dict, write_file)
+        shutil.copyfile(
+            ddjson_path_fw, os.path.join(ds_path, "dataset_description.json")
+        )
 
 
 def get_config():
