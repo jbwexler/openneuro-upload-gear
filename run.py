@@ -36,11 +36,11 @@ def graphql_query(query, openneuro_url, openneuro_api_key):
 def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
     query = """
     query {
-        dataset(id: "accession_number") {
+        dataset(id: "%s") {
             worker
         }
     }
-    """.replace("accession_number", accession_number)
+    """ % accession_number
 
     response_json = graphql_query(query, openneuro_url, openneuro_api_key)
     dataset = response_json["data"]["dataset"]
@@ -56,37 +56,42 @@ def get_git_worker_number(accession_number, openneuro_url, openneuro_api_key):
 
 
 def new_dataset_query(openneuro_url, openneuro_api_key):
-    try:
-        affirmed_defaced = config["defaced"].split(":")[0]
-    except KeyError:
+    defaced_value = config.get("defaced") or ""
+    if defaced_value.startswith("true:"):
+        affirmed_defaced = "true"
+    elif defaced_value.startswith("false:"):
+        affirmed_defaced = "false"
+    else:
         log.error(
             "'generate_new_dataset' is enabled but the 'defaced' config field was not "
-            "provided. Set 'defaced' to indicate whether the dataset has been defaced "
-            "before creating a new dataset."
+            "provided (or did not match an expected value). Set 'defaced' to indicate "
+            "whether the dataset has been defaced before creating a new dataset."
         )
         sys.exit(1)
 
     query = """
     mutation {
-      createDataset(affirmedDefaced: affirmed_defaced) {
+      createDataset(affirmedDefaced: %s) {
         id
       }
     }
-    """.replace("affirmed_defaced", affirmed_defaced)
+    """ % affirmed_defaced
 
     response_json = graphql_query(query, openneuro_url, openneuro_api_key)
     accession_number = response_json["data"]["createDataset"]["id"]
     return accession_number
 
 
-def copy_tree(src, dst, ignore=[]):
+def copy_tree(src, dst, ignore=None):
+    if ignore is None:
+        ignore = []
     if not os.path.exists(dst):
         os.makedirs(dst)
     for item in os.listdir(src):
         s = os.path.join(src, item)
         d = os.path.join(dst, item)
         if os.path.isdir(s):
-            copy_tree(s, d)
+            copy_tree(s, d, ignore=ignore)
         elif os.path.isfile(s):
             if item in ignore:
                 continue
@@ -142,11 +147,16 @@ def bids_validate(bids_path, ddjson_warn=False):
         "bids-validator %s -c %s" % (bids_path, config_path),
         shell=True,
         stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
-    return_code = result.returncode
-    stdout = result.stdout.decode()
-    if return_code == 1:
-        log.error("BIDS validation failed for %s:\n%s", bids_path, stdout)
+    if result.returncode != 0:
+        log.error(
+            "BIDS validation failed for %s (exit %d):\nstdout: %s\nstderr: %s",
+            bids_path,
+            result.returncode,
+            result.stdout.decode(),
+            result.stderr.decode(),
+        )
         sys.exit(1)
 
 
@@ -181,8 +191,9 @@ def find_large_objects(ds_path):
 
 
 def get_bids_data(accession_number):
-    job_level = client.get(destination_id)["parent"]["type"]
-    data_id = client.get(destination_id)["parents"][job_level]
+    destination = client.get(destination_id)
+    job_level = destination["parent"]["type"]
+    data_id = destination["parents"][job_level]
     if job_level == "session":
         sessions = [client.get_session(data_id)]
     elif job_level == "subject":
@@ -191,6 +202,13 @@ def get_bids_data(accession_number):
     elif job_level == "project":
         project = client.get_project(data_id)
         sessions = [s for s in project.sessions() if accession_number not in s.tags]
+    else:
+        log.error(
+            "Unsupported job level '%s'. Run this gear at the session, subject, or "
+            "project level.",
+            job_level,
+        )
+        sys.exit(1)
     session_labels = [s.label for s in sessions]
     if not session_labels:
         if not gtk_context.get_input_path("dataset_description"):
