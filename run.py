@@ -140,10 +140,11 @@ def git_add_all_commit(repo):
 
 def bids_validate(bids_path, ddjson_warn=False):
     config = {
+        "warning": [{"code": "PARTICIPANT_ID_MISMATCH"}],
         "error": [{"code": "NO_AUTHORS"}, {"code": "EMPTY_DATASET_NAME"}],
     }
     if ddjson_warn:
-        config["warning"] = [{"code": "MISSING_DATASET_DESCRIPTION"}]
+        config["warning"].append({"code": "MISSING_DATASET_DESCRIPTION"})
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False
