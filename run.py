@@ -6,8 +6,10 @@ import shutil
 import os.path
 import os
 import pygit2
+import json
 import subprocess
 import sys
+import tempfile
 import contextlib
 import requests
 from urllib.parse import urlparse
@@ -137,10 +139,17 @@ def git_add_all_commit(repo):
 
 
 def bids_validate(bids_path, ddjson_warn=False):
-    if ddjson_warn is True:
-        config_path = os.path.join(FW_PATH, "bids-validator-config_ddjson-warn.json")
-    else:
-        config_path = os.path.join(FW_PATH, "bids-validator-config_ddjson-err.json")
+    config = {
+        "error": [{"code": "NO_AUTHORS"}, {"code": "EMPTY_DATASET_NAME"}],
+    }
+    if ddjson_warn:
+        config["warning"] = [{"code": "MISSING_DATASET_DESCRIPTION"}]
+
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False
+    ) as config_file:
+        json.dump(config, config_file)
+        config_path = config_file.name
 
     result = subprocess.run(
         "bids-validator %s -c %s" % (bids_path, config_path),
@@ -148,6 +157,7 @@ def bids_validate(bids_path, ddjson_warn=False):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+    os.unlink(config_path)
     if result.returncode != 0:
         log.error(
             "BIDS validation failed for %s (exit %d):\nstdout: %s\nstderr: %s",

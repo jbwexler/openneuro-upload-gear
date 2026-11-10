@@ -37,8 +37,6 @@ RUN /opt/conda/envs/openneuro-upload/bin/pip install --no-cache-dir -r /tmp/requ
 RUN mkdir -p ${FLYWHEEL}
 COPY run.py ${FLYWHEEL}/run.py
 COPY gitconfig.txt /root/.gitconfig
-COPY bids-validator-config_ddjson-err.json ${FLYWHEEL}/bids-validator-config_ddjson-err.json
-COPY bids-validator-config_ddjson-warn.json ${FLYWHEEL}/bids-validator-config_ddjson-warn.json
 WORKDIR ${FLYWHEEL}
 
 ENTRYPOINT ["/flywheel/v0/run.py"]
